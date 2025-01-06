@@ -1,18 +1,19 @@
 #include "raylib.h"
 #include <math.h>
-typedef struct Ship {
-    int team; //Ship team
-    Vector2 position; //Current ship Y coordinate
-    int speed; //Current ship speed
-    double heading; //Direction in radians
-} Ship; //Ship object
+#include "gameCalculations.h"
 
-struct {
+// Define obstacles
+typedef struct Obstacle {
     Vector2 position;
-    int radius;
-} spawnCircle; //Circle on which ships will spawn
+    int width;
+    int height;
+} Obstacle;
 
-void updateShipPositions(Ship *ships, int shipCount, double deltaT);
+#define MAX_OBSTACLES 11
+Obstacle obstacles[MAX_OBSTACLES];
+
+void initObstacles();
+void drawObstacles();
 
 int main(void)
 {
@@ -28,17 +29,19 @@ int main(void)
     camera.zoom = 1;
     SetTargetFPS(GetMonitorRefreshRate(display));
     Ship ships[] = {{0, {1000, 500}, 100, 0}};
+    initObstacles();
     while (!WindowShouldClose())
     {
         updateShipPositions(ships, 1, GetFrameTime());
         ships[0].heading = atan2f(ships[0].position.y - GetMouseY() +50, ships[0].position.x - GetMouseX()+50) + M_PI;
         Ship ship = ships[0];
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground(DARKBLUE);
         DrawText(TextFormat("FPS: %d",GetFPS()), 10, 10, 20, GRAY);
+        drawObstacles();
         BeginMode2D(camera);
-        DrawRectangle(ship.position.x, ship.position.y, 100, 100,  RED);
-        DrawLine(ship.position.x+50, ship.position.y+50, ship.speed*cos(ship.heading)+ship.position.x+50, ship.speed*sin(ship.heading)+ship.position.y+50, BLACK);
+        DrawRectangle(ship.position.x, ship.position.y, 50, 50,  RED);
+        DrawLine(ship.position.x+25, ship.position.y+25, ship.speed*cos(ship.heading)+ship.position.x+25, ship.speed*sin(ship.heading)+ship.position.y+25, BLACK);
         EndMode2D();
         EndDrawing();
     }
@@ -49,36 +52,23 @@ int main(void)
 }
 
 
-//Sets the spawn circle position and radius
-void setSpawnCircle(Vector2 pos, int radius) {
-    spawnCircle.position = pos;
-    spawnCircle.radius = radius;
+void initObstacles() {
+    obstacles[0] = (Obstacle){{200, 200}, 160, 100};
+    obstacles[1] = (Obstacle){{500, 550}, 50, 50};
+    obstacles[2] = (Obstacle){{700, 120}, 50, 200};
+    obstacles[3] = (Obstacle){{100, 600}, 200, 50};
+    obstacles[4] = (Obstacle){{1600, 600}, 120, 70};
+    obstacles[5] = (Obstacle){{700, 850}, 150, 50};
+    obstacles[6] = (Obstacle){{1050, 220}, 200, 50};
+    obstacles[7] = (Obstacle){{1250, 800}, 200, 70};
+    obstacles[8] = (Obstacle){{300, 850}, 70,140};
+    obstacles[9] = (Obstacle){{1500, 100}, 200, 50};
+    obstacles[10] = (Obstacle){{1550, 300}, 40,160};
 }
 
-//Sets the initial position of the provided ship on the spawning circle while ensuring the ships are evenly distributed around the spawning circle
-void setInitialPosition(Ship ship, int shipCount, int index) {
-    double increment = (2*M_PI)/shipCount;
-    ship.position = (Vector2){
-        (float)(spawnCircle.radius*cos(increment*index) + spawnCircle.position.x),
-        (float)(spawnCircle.radius*sin(increment*index) + spawnCircle.position.y)
-    };
-}
-
-//Updates the positions of the ships provided based on their current position, speed, and time passed (deltaT in seconds) since last update;
-void updateShipPositions(Ship *ships, int shipCount, double deltaT) {
-    for (int i = 0; i < shipCount; i++) {
-        double speedX = cos(ships[i].heading)*ships[i].speed; //Calculate speed on the X axis
-        double speedY = sin(ships[i].heading)*ships[i].speed; //Calculate speed on the Y axis
-        ships[i].position.x += speedX*deltaT; //Adjust X position
-        ships[i].position.y += speedY*deltaT; //Adjust Y position
-    }
-}
-
-//Initializes the ships provided by setting their heading and speed values to 0 as well as setting their initial position
-void initializeShips(Ship *ships, int shipCount) {
-    for (int i = 0; i < shipCount; i++) {
-        ships[i].heading = 0;
-        ships[i].speed = 0;
-        setInitialPosition(ships[i], shipCount, i);
+// Draw obstacles
+void drawObstacles() {
+    for (int i = 0; i < MAX_OBSTACLES; i++) {
+        DrawRectangle(obstacles[i].position.x, obstacles[i].position.y, obstacles[i].width, obstacles[i].height, DARKGRAY);
     }
 }

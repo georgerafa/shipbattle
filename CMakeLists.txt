@@ -24,7 +24,10 @@ endif()
 
 # Our Project
 
-add_executable(${PROJECT_NAME} main.c)
+add_executable(${PROJECT_NAME} main.c
+        gameCalculations.c
+        gameCalculations.h
+)
 #set(raylib_VERBOSE 1)
 target_link_libraries(${PROJECT_NAME} raylib)
 
@@ -40,4 +43,4 @@ if (APPLE)
     target_link_libraries(${PROJECT_NAME} "-framework Cocoa")
     target_link_libraries(${PROJECT_NAME} "-framework OpenGL")
 endif()
-include_directories("C:/Users/user/CLionProjects/shipbattle/cmake-build-debug/_deps/raylib-src")
+include_directories("cmake-build-debug/_deps/raylib-src")
