@@ -9,6 +9,7 @@ typedef struct ShipStruct {
     Vector2 position; //Current ship Y coordinate
     int speed; //Current ship speed
     double heading; //Direction in radians
+    int isAlive;
 } Ship; //Ship object
 
 

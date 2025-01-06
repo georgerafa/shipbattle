@@ -14,6 +14,8 @@ Obstacle obstacles[MAX_OBSTACLES];
 
 void initObstacles();
 void drawObstacles();
+int checkCollision(Ship ship);
+
 
 int main(void)
 {
@@ -28,13 +30,14 @@ int main(void)
     camera.rotation = 0.0f;
     camera.zoom = 1;
     SetTargetFPS(GetMonitorRefreshRate(display));
-    Ship ships[] = {{0, {1000, 500}, 100, 0}};
+    Ship ships[] = {{0, {1000, 500}, 100, 0, 1}};
     initObstacles();
     while (!WindowShouldClose())
     {
         updateShipPositions(ships, 1, GetFrameTime());
         ships[0].heading = atan2f(ships[0].position.y - GetMouseY() +50, ships[0].position.x - GetMouseX()+50) + M_PI;
         Ship ship = ships[0];
+        ships[0].isAlive = checkCollision(ship);
         BeginDrawing();
         ClearBackground(DARKBLUE);
         DrawText(TextFormat("FPS: %d",GetFPS()), 10, 10, 20, GRAY);
@@ -44,6 +47,7 @@ int main(void)
         DrawLine(ship.position.x+25, ship.position.y+25, ship.speed*cos(ship.heading)+ship.position.x+25, ship.speed*sin(ship.heading)+ship.position.y+25, BLACK);
         EndMode2D();
         EndDrawing();
+
     }
 
     CloseWindow();
@@ -69,6 +73,20 @@ void initObstacles() {
 // Draw obstacles
 void drawObstacles() {
     for (int i = 0; i < MAX_OBSTACLES; i++) {
-        DrawRectangle(obstacles[i].position.x, obstacles[i].position.y, obstacles[i].width, obstacles[i].height, DARKGRAY);
+        DrawRectangle(obstacles[i].position.x, obstacles[i].position.y, obstacles[i].width, obstacles[i].height,DARKGREEN);
     }
+}
+int checkCollision(Ship ship) {
+    // Ship's rectangle
+    Rectangle shipRect = {ship.position.x, ship.position.y, 100, 100};
+
+    // Check for collisions with all obstacles
+    for (int i = 0; i < MAX_OBSTACLES; i++) {
+        Rectangle obstacleRect = {obstacles[i].position.x, obstacles[i].position.y, obstacles[i].width, obstacles[i].height};
+        if (CheckCollisionRecs(shipRect, obstacleRect)) {
+            return 0; // Collision detected
+        }
+    }
+
+    return 1; // No collision
 }
