@@ -12,6 +12,13 @@ typedef struct ShipStruct {
     int isAlive;
 } Ship; //Ship object
 
+typedef struct ProjectileStruct {
+    int team;
+    Vector3 position;
+    Vector3 speed;
+    double heading;
+    double angle;
+} Projectile;
 
 void setSpawnCircle(Vector2 pos, int radius);
 void setInitialPosition(Ship ship, int shipCount, int index);

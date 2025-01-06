@@ -2,6 +2,9 @@
 #include "raylib.h"
 #include "gameCalculations.h"
 typedef struct ShipStruct Ship;
+typedef struct ProjectileStruct Projectile;
+const int PROJECTILE_SPEED = 400;
+const float GRAVITY = 9.81f;
 struct {
     Vector2 position;
     int radius;
@@ -39,3 +42,21 @@ void initializeShips(Ship *ships, int shipCount) {
         setInitialPosition(ships[i], shipCount, i);
     }
 }
+
+void initializeProjeciles(Projectile *projectiles, int projectileCount) {
+    for (int i = 0; i < projectileCount; i++) {
+        projectiles[i].speed.x = cos(projectiles[i].heading)*cos(projectiles[i].angle)*PROJECTILE_SPEED;
+        projectiles[i].speed.y = sin(projectiles[i].heading)*cos(projectiles[i].angle)*PROJECTILE_SPEED;
+        projectiles[i].speed.z = sin(projectiles[i].angle)*PROJECTILE_SPEED;
+    }
+}
+
+void updateProjectiles(Projectile *projectiles, int projectileCount, double deltaT) {
+    for (int i = 0; i < projectileCount; i++) {
+        Projectile projectile = projectiles[i];
+        if (projectiles[i].position.z > 0) {
+            projectiles[i].position = (Vector3){projectile.position.x+projectile.speed.x, projectile.position.y+projectile.speed.y, projectile.position.z+projectile.speed.z};
+            projectiles[i].speed.z -= GRAVITY*deltaT;
+        }
+    }
+};
