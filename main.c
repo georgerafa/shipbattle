@@ -12,11 +12,13 @@ typedef struct Obstacle {
 #define MAX_OBSTACLES 11
 Obstacle obstacles[MAX_OBSTACLES];
 
+
+
 void initObstacles();
 void drawObstacles();
 int checkCollision(Ship ship);
 
-
+Texture2D obstacleTexture;
 int main(void)
 {
     InitWindow(800, 800, "raylib [core] example - basic window");
@@ -25,6 +27,9 @@ int main(void)
     const int screenHeight = GetMonitorHeight(display);
     SetWindowSize(screenWidth, screenHeight);
     ToggleFullscreen();
+    Image obstacleImage=LoadImage("island.png");
+    obstacleTexture= LoadTextureFromImage(obstacleImage);
+    UnloadImage(obstacleImage);
     Camera2D camera = {0};
     camera.target = (Vector2){0, 0};
     camera.rotation = 0.0f;
@@ -49,6 +54,7 @@ int main(void)
         EndDrawing();
 
     }
+UnloadTexture(obstacleTexture);
 
     CloseWindow();
 
