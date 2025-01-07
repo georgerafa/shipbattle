@@ -2,24 +2,9 @@
 #include "raylib.h"
 #include "gameCalculations.h"
 typedef struct ShipStruct Ship;
-struct {
-    Vector2 position;
-    int radius;
-} spawnCircle; //Circle on which ships will spawn
-//Sets the spawn circle position and radius
-void setSpawnCircle(Vector2 pos, int radius) {
-    spawnCircle.position = pos;
-    spawnCircle.radius = radius;
-}
-
-//Sets the initial position of the provided ship on the spawning circle while ensuring the ships are evenly distributed around the spawning circle
-void setInitialPosition(Ship ship, int shipCount, int index) {
-    double increment = (2*M_PI)/shipCount;
-    ship.position = (Vector2){
-        (float)(spawnCircle.radius*cos(increment*index) + spawnCircle.position.x),
-        (float)(spawnCircle.radius*sin(increment*index) + spawnCircle.position.y)
-    };
-}
+typedef struct ProjectileStruct Projectile;
+const int PROJECTILE_SPEED = 500; //The initial projectile speed
+const int GRAVITY = 90; //Gravitational acceleration
 
 //Updates the positions of the ships provided based on their current position, speed, and time passed (deltaT in seconds) since last update;
 void updateShipPositions(Ship *ships, int shipCount, double deltaT) {
@@ -39,3 +24,23 @@ void initializeShips(Ship *ships, int shipCount) {
         setInitialPosition(ships[i], shipCount, i);
     }
 }
+
+
+void initializeProjectiles(Projectile *projectiles, int projectileCount) { //Initialize the provided projectiles by setting calculating their speed on each axis based on where they are looking
+    for (int i = 0; i < projectileCount; i++) {
+        projectiles[i].speed.x = cos(projectiles[i].heading)*cos(projectiles[i].angle)*PROJECTILE_SPEED;
+        projectiles[i].speed.y = sin(projectiles[i].heading)*cos(projectiles[i].angle)*PROJECTILE_SPEED;
+        projectiles[i].speed.z = sin(projectiles[i].angle)*PROJECTILE_SPEED;
+    }
+}
+
+//Update the projectiles' speeds and positions while also applying gravity
+void updateProjectiles(Projectile *projectiles, int projectileCount, double deltaT) {
+    for (int i = 0; i < projectileCount; i++) {
+        Projectile projectile = projectiles[i];
+        if (projectiles[i].position.z > 0) {
+            projectiles[i].position = (Vector3){projectile.position.x+projectile.speed.x*deltaT, projectile.position.y+projectile.speed.y*deltaT, projectile.position.z+projectile.speed.z*deltaT};
+            projectiles[i].speed.z -= GRAVITY*deltaT;
+        }
+    }
+};
