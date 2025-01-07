@@ -2,15 +2,15 @@
 #include <math.h>
 #include "gameCalculations.h"
 
-// Define obstacles
 typedef struct Obstacle {
     Vector2 position;
     int width;
     int height;
-    Texture2D texture; // Texture for the obstacle
+    Texture2D texture;
 } Obstacle;
 
 #define MAX_OBSTACLES 8
+#define MAX_PLAYERS 6
 Obstacle obstacles[MAX_OBSTACLES];
 
 void initObstacles(Texture2D islandTexture, Texture2D island2Texture);
@@ -18,7 +18,11 @@ void drawObstacles();
 int checkCollision(Ship ship);
 
 Texture2D shipTexture;
-Texture2D oceanTexture;  // Ocean background texture
+Texture2D oceanTexture;
+Texture2D backgroundTexture;
+typedef enum GameScreen { LOGO, TITLE, PLAYER_SELECT, GAME } GameScreen;
+GameScreen currentScreen = TITLE;
+int selectedPlayers = 2;
 
 int main(void)
 {
@@ -31,8 +35,13 @@ int main(void)
 
     // Load ocean image and scale it to cover the entire screen
     Image oceanImage = LoadImage("assets/ocean.png");
-    Texture2D oceanTexture = LoadTextureFromImage(oceanImage);
+    oceanTexture = LoadTextureFromImage(oceanImage);
     UnloadImage(oceanImage);  // Unload the original image after creating the texture
+
+    // Load background image
+    Image backgroundImage = LoadImage("assets/background.png");
+    backgroundTexture = LoadTextureFromImage(backgroundImage);
+    UnloadImage(backgroundImage);  // Unload the original image after creating the texture
 
     // Resize island images to fit the desired size
     Image islandImage = LoadImage("assets/island.png");
@@ -53,52 +62,122 @@ int main(void)
     camera.target = (Vector2){0, 0};
     camera.rotation = 0.0f;
     camera.zoom = 1;
-    SetTargetFPS(GetMonitorRefreshRate(display));
+    SetTargetFPS(60);
 
-    Ship ships[] = {{0, {1000, 500}, 100, 0, 1}};
+    Ship ships[MAX_PLAYERS];
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        ships[i] = (Ship){0, {1000 + (i * 120), 500}, 100, 0, 1};  // Initialize ships with offset positions
+    }
     initObstacles(islandTexture, island2Texture);
 
     while (!WindowShouldClose())
     {
-        // Update ship positions
-        updateShipPositions(ships, 1, GetFrameTime());
+        switch (currentScreen)
+        {
+            case TITLE:
+                if (IsKeyPressed(KEY_ENTER) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+                {
+                    currentScreen = PLAYER_SELECT;
+                }
 
-        // Calculate heading so that the tip of the ship follows the mouse
-        Vector2 mousePosWorld = GetScreenToWorld2D(GetMousePosition(), camera);
-        ships[0].heading = atan2f(mousePosWorld.y - ships[0].position.y, mousePosWorld.x - ships[0].position.x);
+                BeginDrawing();
+                ClearBackground(RAYWHITE);
 
-        Ship ship = ships[0];
-        ships[0].isAlive = checkCollision(ship);
+            DrawTexturePro(
+                backgroundTexture,
+                (Rectangle){0, 0, backgroundTexture.width, backgroundTexture.height},
+                (Rectangle){0, 0, screenWidth, screenHeight},
+                (Vector2){0, 0},
+                0.0f,
+                WHITE);
 
-        BeginDrawing();
-        ClearBackground(DARKBLUE);
+                DrawText("Welcome to Mononaumaxia!", 100, 100, 50, WHITE);
+                DrawText("Press ENTER or click to start", 100, 200, 30, WHITE);
 
-        DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GRAY);
+                EndDrawing();
+                break;
 
-        BeginMode2D(camera);
+            case PLAYER_SELECT:
+                if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) {
+                    if (IsKeyPressed(KEY_UP) && selectedPlayers > 1) {
+                        selectedPlayers--;
+                    } else if (IsKeyPressed(KEY_DOWN) && selectedPlayers < MAX_PLAYERS) {
+                        selectedPlayers++;
+                    }
+                }
 
-        // Draw ocean background scaled to cover the whole screen
-        DrawTexture(oceanTexture, 0, 0, WHITE);  // Draw the ocean at (0, 0)
+                if (IsKeyPressed(KEY_ENTER)) {
+                    currentScreen = GAME;
+                }
 
-        // Draw obstacles with their respective textures
-        drawObstacles();
+                BeginDrawing();
+                ClearBackground(RAYWHITE);
 
-        // Draw the ship
-        DrawTexturePro(
-            shipTexture,
-            (Rectangle){0, 0, shipTexture.width, shipTexture.height},  // Source rectangle
-            (Rectangle){ship.position.x, ship.position.y, 100, 100},  // Destination rectangle (2x size)
-            (Vector2){50, 50},                                       // Origin (center for rotation)
-            (ships[0].heading * RAD2DEG) + 270,                      // Rotation in degrees (heading + 3π/2)
-            WHITE);
+            DrawTexturePro(
+             backgroundTexture,
+             (Rectangle){0, 0, backgroundTexture.width, backgroundTexture.height},
+             (Rectangle){0, 0, screenWidth, screenHeight},
+             (Vector2){0, 0},
+             0.0f,
+             WHITE);
 
-        EndMode2D();
+                DrawText("Select Number of Players (2 to 6)", 100, 100, 40, WHITE);
+                DrawText("Press UP/DOWN arrows to choose", 100, 160, 30, WHITE);
+                DrawText("Press ENTER to start", 100, 200, 30, WHITE);
 
-        EndDrawing();
+                for (int i = 2; i <= MAX_PLAYERS; i++) {
+                    if (i == selectedPlayers) {
+                        DrawText(TextFormat("> %d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 1) * 40, 40, GREEN);
+                    } else {
+                        DrawText(TextFormat("%d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 1) * 40, 40, WHITE);
+                    }
+                }
+
+                EndDrawing();
+                break;
+
+            case GAME:
+                updateShipPositions(ships, selectedPlayers, GetFrameTime());
+
+                for (int i = 0; i < selectedPlayers; i++) {
+                    Vector2 mousePosWorld = GetScreenToWorld2D(GetMousePosition(), camera);
+                    ships[i].heading = atan2f(mousePosWorld.y - ships[i].position.y, mousePosWorld.x - ships[i].position.x);
+                }
+
+                for (int i = 0; i < selectedPlayers; i++) {
+                    ships[i].isAlive = checkCollision(ships[i]);
+                }
+
+                BeginDrawing();
+                ClearBackground(DARKBLUE);
+
+                DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GRAY);
+
+                BeginMode2D(camera);
+
+                DrawTexture(oceanTexture, 0, 0, WHITE);
+
+                drawObstacles();
+
+                for (int i = 0; i < selectedPlayers; i++) {
+                    DrawTexturePro(
+                        shipTexture,
+                        (Rectangle){0, 0, shipTexture.width, shipTexture.height},
+                        (Rectangle){ships[i].position.x, ships[i].position.y, 100, 100},
+                        (Vector2){50, 50},
+                        (ships[i].heading * RAD2DEG) + 270,
+                        WHITE);
+                }
+
+                EndMode2D();
+
+                EndDrawing();
+                break;
+        }
     }
 
-    // Unload textures
     UnloadTexture(oceanTexture);
+    UnloadTexture(backgroundTexture);
     UnloadTexture(islandTexture);
     UnloadTexture(island2Texture);
     UnloadTexture(shipTexture);
@@ -110,7 +189,6 @@ int main(void)
 
 void initObstacles(Texture2D islandTexture, Texture2D island2Texture)
 {
-    // Assign some obstacles to use islandTexture, others to use island2Texture
     obstacles[0] = (Obstacle){{200, 100}, 160, 100, islandTexture};
     obstacles[1] = (Obstacle){{600, 750}, 50, 50, islandTexture};
     obstacles[2] = (Obstacle){{700, 70}, 50, 200, island2Texture};
@@ -134,16 +212,14 @@ void drawObstacles()
 
 int checkCollision(Ship ship)
 {
-    // Ship's rectangle
     Rectangle shipRect = {ship.position.x, ship.position.y, 100, 100};
 
-    // Check for collisions with all obstacles
     for (int i = 0; i < MAX_OBSTACLES; i++) {
         Rectangle obstacleRect = {obstacles[i].position.x, obstacles[i].position.y, obstacles[i].width, obstacles[i].height};
         if (CheckCollisionRecs(shipRect, obstacleRect)) {
-            return 0; // Collision detected
+            return 0;
         }
     }
 
-    return 1; // No collision
+    return 1;
 }
