@@ -21,7 +21,6 @@ void initializeShips(Ship *ships, int shipCount) {
     for (int i = 0; i < shipCount; i++) {
         ships[i].heading = 0;
         ships[i].speed = 0;
-        setInitialPosition(ships[i], shipCount, i);
     }
 }
 

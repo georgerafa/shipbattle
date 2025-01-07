@@ -16,8 +16,6 @@ typedef struct ProjectileStruct {
     double angle; //Elevation angle in radians
 } Projectile;
 
-void setSpawnCircle(Vector2 pos, int radius);
-void setInitialPosition(Ship ship, int shipCount, int index);
 void updateShipPositions(Ship *ships, int shipCount, double deltaT);
 void updateProjectiles(Projectile *projectiles, int projectileCount, double deltaT);
 void initializeProjectiles(Projectile *projectiles, int projectileCount);
