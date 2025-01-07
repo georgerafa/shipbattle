@@ -10,7 +10,7 @@ typedef struct Obstacle {
     Texture2D texture; // Texture for the obstacle
 } Obstacle;
 
-#define MAX_OBSTACLES 11
+#define MAX_OBSTACLES 8
 Obstacle obstacles[MAX_OBSTACLES];
 
 void initObstacles(Texture2D islandTexture, Texture2D island2Texture);
@@ -18,6 +18,7 @@ void drawObstacles();
 int checkCollision(Ship ship);
 
 Texture2D shipTexture;
+Texture2D oceanTexture;  // Ocean background texture
 
 int main(void)
 {
@@ -28,12 +29,19 @@ int main(void)
     SetWindowSize(screenWidth, screenHeight);
     ToggleFullscreen();
 
-    // Load textures
+    // Load ocean image and scale it to cover the entire screen
+    Image oceanImage = LoadImage("assets/ocean.png");
+    Texture2D oceanTexture = LoadTextureFromImage(oceanImage);
+    UnloadImage(oceanImage);  // Unload the original image after creating the texture
+
+    // Resize island images to fit the desired size
     Image islandImage = LoadImage("assets/island.png");
+    ImageResize(&islandImage, 250, 250);
     Texture2D islandTexture = LoadTextureFromImage(islandImage);
     UnloadImage(islandImage);
 
     Image island2Image = LoadImage("assets/island2.png");
+    ImageResize(&island2Image, 250, 250);
     Texture2D island2Texture = LoadTextureFromImage(island2Image);
     UnloadImage(island2Image);
 
@@ -69,6 +77,9 @@ int main(void)
 
         BeginMode2D(camera);
 
+        // Draw ocean background scaled to cover the whole screen
+        DrawTexture(oceanTexture, 0, 0, WHITE);  // Draw the ocean at (0, 0)
+
         // Draw obstacles with their respective textures
         drawObstacles();
 
@@ -87,6 +98,7 @@ int main(void)
     }
 
     // Unload textures
+    UnloadTexture(oceanTexture);
     UnloadTexture(islandTexture);
     UnloadTexture(island2Texture);
     UnloadTexture(shipTexture);
@@ -99,17 +111,14 @@ int main(void)
 void initObstacles(Texture2D islandTexture, Texture2D island2Texture)
 {
     // Assign some obstacles to use islandTexture, others to use island2Texture
-    obstacles[0] = (Obstacle){{200, 200}, 160, 100, islandTexture};
-    obstacles[1] = (Obstacle){{500, 550}, 50, 50, island2Texture};
-    obstacles[2] = (Obstacle){{700, 120}, 50, 200, islandTexture};
-    obstacles[3] = (Obstacle){{100, 600}, 200, 50, island2Texture};
-    obstacles[4] = (Obstacle){{1600, 600}, 120, 70, islandTexture};
-    obstacles[5] = (Obstacle){{700, 850}, 150, 50, island2Texture};
-    obstacles[6] = (Obstacle){{1050, 220}, 200, 50, islandTexture};
-    obstacles[7] = (Obstacle){{1250, 800}, 200, 70, island2Texture};
-    obstacles[8] = (Obstacle){{300, 850}, 70, 140, islandTexture};
-    obstacles[9] = (Obstacle){{1500, 100}, 200, 50, island2Texture};
-    obstacles[10] = (Obstacle){{1550, 300}, 40, 160, islandTexture};
+    obstacles[0] = (Obstacle){{200, 100}, 160, 100, islandTexture};
+    obstacles[1] = (Obstacle){{600, 750}, 50, 50, islandTexture};
+    obstacles[2] = (Obstacle){{700, 70}, 50, 200, island2Texture};
+    obstacles[3] = (Obstacle){{200, 500}, 200, 50, island2Texture};
+    obstacles[4] = (Obstacle){{1500, 600}, 120, 70, islandTexture};
+    obstacles[5] = (Obstacle){{1150, 120}, 200, 50, islandTexture};
+    obstacles[6] = (Obstacle){{1050, 700}, 200, 70, island2Texture};
+    obstacles[7] = (Obstacle){{1500, 300}, 200, 50, island2Texture};
 }
 
 void drawObstacles()
