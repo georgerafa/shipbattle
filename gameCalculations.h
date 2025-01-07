@@ -23,5 +23,7 @@ typedef struct ProjectileStruct {
 void setSpawnCircle(Vector2 pos, int radius);
 void setInitialPosition(Ship ship, int shipCount, int index);
 void updateShipPositions(Ship *ships, int shipCount, double deltaT);
+void updateProjectiles(Projectile *projectiles, int projectileCount, double deltaT);
+void initializeProjectiles(Projectile *projectiles, int projectileCount);
 
 #endif //GAMECALCULATIONS_H
