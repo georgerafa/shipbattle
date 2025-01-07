@@ -1,17 +1,64 @@
 #include "raylib.h"
 #include <math.h>
 #include "gameCalculations.h"
+#include "raymath.h"
 
 typedef struct Obstacle {
     Vector2 position;
-    int width;
-    int height;
-    Texture2D texture;
+    Texture2D texture; // Texture for the obstacle
+    int islandType;
 } Obstacle;
+
+struct Line {
+    Vector2 start;
+    Vector2 end;
+};
+
 
 #define MAX_OBSTACLES 8
 #define MAX_PLAYERS 6
 Obstacle obstacles[MAX_OBSTACLES];
+
+const struct Line island1HitboxLines[19] =
+{{{66,12},{1,82}},
+{{1,82},{2,125}},
+{{2,125},{17,146}},
+{{17,146},{27,180}},
+{{27,180},{88,177}},
+{{88,177},{118,214}},
+{{118,214},{102,237}},
+{{102,237},{119,253}},
+{{119,253},{162,223}},
+{{162,223},{144,191}},
+{{144,191},{191,168}},
+{{191,168},{217,192}},
+{{217,192},{242,159}},
+{{242,159},{243,134}},
+{{243,134},{228,111}},
+{{228,111},{221,80}},
+{{221,80},{205,58}},
+{{205,58},{128,1}},
+{{128,1},{66,12}}
+};
+
+const struct Line island2HitboxLines[15] =
+{{{72,1},{48,26}},
+{{48,26},{29,70}},
+{{29,70},{9,85}},
+{{9,85},{0,126}},
+{{0,126},{13,153}},
+{{13,153},{57,178}},
+{{57,178},{76,174}},
+{{76,174},{153,249}},
+{{153,249},{228,179}},
+{{228,179},{250,133}},
+{{250,133},{219,62}},
+{{219,62},{173,32}},
+{{173,32},{132,26}},
+{{132,26},{111,35}},
+{{111,35},{72,1}}
+};
+
 
 void initObstacles(Texture2D islandTexture, Texture2D island2Texture);
 void drawObstacles();
@@ -158,18 +205,19 @@ int main(void)
                 DrawTexture(oceanTexture, 0, 0, WHITE);
 
                 drawObstacles();
-
-                for (int i = 0; i < selectedPlayers; i++) {
-                    DrawTexturePro(
-                        shipTexture,
-                        (Rectangle){0, 0, shipTexture.width, shipTexture.height},
-                        (Rectangle){ships[i].position.x, ships[i].position.y, 100, 100},
-                        (Vector2){50, 50},
-                        (ships[i].heading * RAD2DEG) + 270,
-                        WHITE);
-                }
-
-                EndMode2D();
+        Ship ship = ships[0];
+        // Draw the ship
+        if (ship.isAlive) {
+            checkCollision(ships[0]);
+            DrawTexturePro(
+                shipTexture,
+                (Rectangle){0, 0, shipTexture.width, shipTexture.height},  // Source rectangle
+                (Rectangle){ship.position.x, ship.position.y, 100, 100},  // Destination rectangle (2x size)
+                (Vector2){50, 50},                                       // Origin (center for rotation)
+                (ships[0].heading * RAD2DEG) + 270,                      // Rotation in degrees (heading + 3π/2)
+                WHITE);
+        }
+        EndMode2D();
 
                 EndDrawing();
                 break;
@@ -189,37 +237,91 @@ int main(void)
 
 void initObstacles(Texture2D islandTexture, Texture2D island2Texture)
 {
-    obstacles[0] = (Obstacle){{200, 100}, 160, 100, islandTexture};
-    obstacles[1] = (Obstacle){{600, 750}, 50, 50, islandTexture};
-    obstacles[2] = (Obstacle){{700, 70}, 50, 200, island2Texture};
-    obstacles[3] = (Obstacle){{200, 500}, 200, 50, island2Texture};
-    obstacles[4] = (Obstacle){{1500, 600}, 120, 70, islandTexture};
-    obstacles[5] = (Obstacle){{1150, 120}, 200, 50, islandTexture};
-    obstacles[6] = (Obstacle){{1050, 700}, 200, 70, island2Texture};
-    obstacles[7] = (Obstacle){{1500, 300}, 200, 50, island2Texture};
+    // Assign some obstacles to use islandTexture, others to use island2Texture
+    obstacles[0] = (Obstacle){{200, 100}, islandTexture, 0};
+    obstacles[1] = (Obstacle){{600, 750}, islandTexture, 0};
+    obstacles[2] = (Obstacle){{700, 70},  island2Texture, 1};
+    obstacles[3] = (Obstacle){{200, 500}, island2Texture,1};
+    obstacles[4] = (Obstacle){{1500, 600},  islandTexture, 0};
+    obstacles[5] = (Obstacle){{1150, 120},  islandTexture, 0};
+    obstacles[6] = (Obstacle){{1050, 700},  island2Texture, 1};
+    obstacles[7] = (Obstacle){{1500, 300},  island2Texture, 1};
 }
 
 void drawObstacles()
 {
     for (int i = 0; i < MAX_OBSTACLES; i++) {
+        Obstacle obstacle = obstacles[i];
         DrawTexture(
-            obstacles[i].texture,
-            obstacles[i].position.x,
-            obstacles[i].position.y,
+            obstacle.texture,
+            obstacle.position.x,
+            obstacle.position.y,
             WHITE);
     }
 }
 
 int checkCollision(Ship ship)
 {
-    Rectangle shipRect = {ship.position.x, ship.position.y, 100, 100};
-
-    for (int i = 0; i < MAX_OBSTACLES; i++) {
-        Rectangle obstacleRect = {obstacles[i].position.x, obstacles[i].position.y, obstacles[i].width, obstacles[i].height};
-        if (CheckCollisionRecs(shipRect, obstacleRect)) {
-            return 0;
+    Vector2 shipPos = ship.position;
+    struct Line shipLines[4] = {
+        {
+            {-40*cos(ship.heading)-15*sin(ship.heading)+shipPos.x,-40*sin(ship.heading)+15*cos(ship.heading)+shipPos.y},
+           {40*cos(ship.heading)-15*sin(ship.heading)+shipPos.x,40*sin(ship.heading)+15*cos(ship.heading)+shipPos.y}
+        },
+        {
+            {-40*cos(ship.heading)+15*sin(ship.heading)+shipPos.x, -40*sin(ship.heading)-15*cos(ship.heading)+shipPos.y},
+            {40*cos(ship.heading)+15*sin(ship.heading)+shipPos.x, 40*sin(ship.heading)-15*cos(ship.heading)+shipPos.y}
+        },
+        {
+            {-40*cos(ship.heading)-15*sin(ship.heading)+shipPos.x, -40*sin(ship.heading)+15*cos(ship.heading)+shipPos.y},
+            {-40*cos(ship.heading)+15*sin(ship.heading)+shipPos.x, -40*sin(ship.heading)-15*cos(ship.heading)+shipPos.y}
+        },
+        {
+            {40*cos(ship.heading)-15*sin(ship.heading)+shipPos.x, 40*sin(ship.heading)+15*cos(ship.heading)+shipPos.y},
+            {40*cos(ship.heading)+15*sin(ship.heading)+shipPos.x, 40*sin(ship.heading)-15*cos(ship.heading)+shipPos.y}
         }
-    }
+    };
+    for (int i = 0; i < MAX_OBSTACLES; i++) {
+        Obstacle obstacle = obstacles[i];
+        Vector2 offset = {obstacle.position.x, obstacle.position.y};
+        if(Vector2Length(Vector2Subtract(Vector2Add(obstacle.position, (Vector2){obstacle.texture.width/2, obstacle.texture.height/2}),ship.position)) < 200) {
+            if (obstacle.islandType == 0) {
+                for (int j = 0; j<19; j++) {
+                    Vector2 colP;
+                    for (int k = 0; k<4; k++) {
+                        DrawLineV(Vector2Add(island1HitboxLines[j].start, offset),
+                            Vector2Add(island1HitboxLines[j].end, offset), WHITE);
+                        DrawLineV(shipLines[k].start,
+                            shipLines[k].end, WHITE);
+                        if (CheckCollisionLines(
+                            Vector2Add(island1HitboxLines[j].start, offset),
+                            Vector2Add(island1HitboxLines[j].end, offset),
+                            shipLines[k].start,
+                            shipLines[k].end,
+                             &colP)) return 0;
+                    }
+                }
+            }
+            else {
+                for (int j = 0; j<15; j++) {
+                    Vector2 colP;
+                    for (int k = 0; k<4; k++) {
+                        DrawLineV(Vector2Add(island2HitboxLines[j].start, offset),
+                                                    Vector2Add(island2HitboxLines[j].end, offset), WHITE);
+                        DrawLineV(shipLines[k].start,
+                            shipLines[k].end, WHITE);
+                        if (CheckCollisionLines(
+                        Vector2Add(island2HitboxLines[j].start, offset),
+                        Vector2Add(island2HitboxLines[j].end, offset),
+                            shipLines[k].start,
+                            shipLines[k].end,
+                             &colP)) return 0;
+                    }
+                }
+            }
+        }
 
-    return 1;
+
+    }
+    return 1;// No collision
 }
