@@ -27,7 +27,7 @@ int main(void)
     const int screenHeight = GetMonitorHeight(display);
     SetWindowSize(screenWidth, screenHeight);
     ToggleFullscreen();
-    Image obstacleImage=LoadImage("island.png");
+    Image obstacleImage=LoadImage("assets/ship.png");
     obstacleTexture= LoadTextureFromImage(obstacleImage);
     UnloadImage(obstacleImage);
     Camera2D camera = {0};
@@ -39,18 +39,21 @@ int main(void)
     initObstacles();
     while (!WindowShouldClose())
     {
+        camera.zoom += GetMouseWheelMove()*0.05f;
         updateShipPositions(ships, 1, GetFrameTime());
-        ships[0].heading = atan2f(ships[0].position.y - GetMouseY() +50, ships[0].position.x - GetMouseX()+50) + M_PI;
+        ships[0].heading = atan2f(ships[0].position.y - (GetMouseY()/camera.zoom)+25, ships[0].position.x - GetMouseX()/camera.zoom+25) + M_PI;
         Ship ship = ships[0];
         ships[0].isAlive = checkCollision(ship);
         BeginDrawing();
         ClearBackground(DARKBLUE);
         DrawText(TextFormat("FPS: %d",GetFPS()), 10, 10, 20, GRAY);
-        drawObstacles();
         BeginMode2D(camera);
+        drawObstacles();
         DrawRectangle(ship.position.x, ship.position.y, 50, 50,  RED);
         DrawLine(ship.position.x+25, ship.position.y+25, ship.speed*cos(ship.heading)+ship.position.x+25, ship.speed*sin(ship.heading)+ship.position.y+25, BLACK);
         EndMode2D();
+        DrawTexture(obstacleTexture, 200, 200, WHITE);
+
         EndDrawing();
 
     }
