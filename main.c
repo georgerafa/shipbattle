@@ -7,18 +7,18 @@ typedef struct Obstacle {
     Vector2 position;
     int width;
     int height;
+    Texture2D texture; // Texture for the obstacle
 } Obstacle;
 
 #define MAX_OBSTACLES 11
 Obstacle obstacles[MAX_OBSTACLES];
 
-
-
-void initObstacles();
+void initObstacles(Texture2D islandTexture, Texture2D island2Texture);
 void drawObstacles();
 int checkCollision(Ship ship);
 
-Texture2D obstacleTexture;
+Texture2D shipTexture;
+
 int main(void)
 {
     InitWindow(800, 800, "raylib [core] example - basic window");
@@ -27,65 +27,104 @@ int main(void)
     const int screenHeight = GetMonitorHeight(display);
     SetWindowSize(screenWidth, screenHeight);
     ToggleFullscreen();
-    Image obstacleImage=LoadImage("assets/ship.png");
-    obstacleTexture= LoadTextureFromImage(obstacleImage);
-    UnloadImage(obstacleImage);
+
+    // Load textures
+    Image islandImage = LoadImage("assets/island.png");
+    Texture2D islandTexture = LoadTextureFromImage(islandImage);
+    UnloadImage(islandImage);
+
+    Image island2Image = LoadImage("assets/island2.png");
+    Texture2D island2Texture = LoadTextureFromImage(island2Image);
+    UnloadImage(island2Image);
+
+    Image shipImage = LoadImage("assets/ship.png");
+    shipTexture = LoadTextureFromImage(shipImage);
+    UnloadImage(shipImage);
+
     Camera2D camera = {0};
     camera.target = (Vector2){0, 0};
     camera.rotation = 0.0f;
     camera.zoom = 1;
     SetTargetFPS(GetMonitorRefreshRate(display));
+
     Ship ships[] = {{0, {1000, 500}, 100, 0, 1}};
-    initObstacles();
+    initObstacles(islandTexture, island2Texture);
+
     while (!WindowShouldClose())
     {
-        camera.zoom += GetMouseWheelMove()*0.05f;
+        // Update ship positions
         updateShipPositions(ships, 1, GetFrameTime());
-        ships[0].heading = atan2f(ships[0].position.y - (GetMouseY()/camera.zoom)+25, ships[0].position.x - GetMouseX()/camera.zoom+25) + M_PI;
+
+        // Calculate heading so that the tip of the ship follows the mouse
+        Vector2 mousePosWorld = GetScreenToWorld2D(GetMousePosition(), camera);
+        ships[0].heading = atan2f(mousePosWorld.y - ships[0].position.y, mousePosWorld.x - ships[0].position.x);
+
         Ship ship = ships[0];
         ships[0].isAlive = checkCollision(ship);
+
         BeginDrawing();
         ClearBackground(DARKBLUE);
-        DrawText(TextFormat("FPS: %d",GetFPS()), 10, 10, 20, GRAY);
+
+        DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GRAY);
+
         BeginMode2D(camera);
+
+        // Draw obstacles with their respective textures
         drawObstacles();
-        DrawRectangle(ship.position.x, ship.position.y, 50, 50,  RED);
-        DrawLine(ship.position.x+25, ship.position.y+25, ship.speed*cos(ship.heading)+ship.position.x+25, ship.speed*sin(ship.heading)+ship.position.y+25, BLACK);
+
+        // Draw the ship
+        DrawTexturePro(
+            shipTexture,
+            (Rectangle){0, 0, shipTexture.width, shipTexture.height},  // Source rectangle
+            (Rectangle){ship.position.x, ship.position.y, 100, 100},  // Destination rectangle (2x size)
+            (Vector2){50, 50},                                       // Origin (center for rotation)
+            (ships[0].heading * RAD2DEG) + 270,                      // Rotation in degrees (heading + 3π/2)
+            WHITE);
+
         EndMode2D();
-        DrawTexture(obstacleTexture, 200, 200, WHITE);
 
         EndDrawing();
-
     }
-UnloadTexture(obstacleTexture);
+
+    // Unload textures
+    UnloadTexture(islandTexture);
+    UnloadTexture(island2Texture);
+    UnloadTexture(shipTexture);
 
     CloseWindow();
 
     return 0;
 }
 
-
-void initObstacles() {
-    obstacles[0] = (Obstacle){{200, 200}, 160, 100};
-    obstacles[1] = (Obstacle){{500, 550}, 50, 50};
-    obstacles[2] = (Obstacle){{700, 120}, 50, 200};
-    obstacles[3] = (Obstacle){{100, 600}, 200, 50};
-    obstacles[4] = (Obstacle){{1600, 600}, 120, 70};
-    obstacles[5] = (Obstacle){{700, 850}, 150, 50};
-    obstacles[6] = (Obstacle){{1050, 220}, 200, 50};
-    obstacles[7] = (Obstacle){{1250, 800}, 200, 70};
-    obstacles[8] = (Obstacle){{300, 850}, 70,140};
-    obstacles[9] = (Obstacle){{1500, 100}, 200, 50};
-    obstacles[10] = (Obstacle){{1550, 300}, 40,160};
+void initObstacles(Texture2D islandTexture, Texture2D island2Texture)
+{
+    // Assign some obstacles to use islandTexture, others to use island2Texture
+    obstacles[0] = (Obstacle){{200, 200}, 160, 100, islandTexture};
+    obstacles[1] = (Obstacle){{500, 550}, 50, 50, island2Texture};
+    obstacles[2] = (Obstacle){{700, 120}, 50, 200, islandTexture};
+    obstacles[3] = (Obstacle){{100, 600}, 200, 50, island2Texture};
+    obstacles[4] = (Obstacle){{1600, 600}, 120, 70, islandTexture};
+    obstacles[5] = (Obstacle){{700, 850}, 150, 50, island2Texture};
+    obstacles[6] = (Obstacle){{1050, 220}, 200, 50, islandTexture};
+    obstacles[7] = (Obstacle){{1250, 800}, 200, 70, island2Texture};
+    obstacles[8] = (Obstacle){{300, 850}, 70, 140, islandTexture};
+    obstacles[9] = (Obstacle){{1500, 100}, 200, 50, island2Texture};
+    obstacles[10] = (Obstacle){{1550, 300}, 40, 160, islandTexture};
 }
 
-// Draw obstacles
-void drawObstacles() {
+void drawObstacles()
+{
     for (int i = 0; i < MAX_OBSTACLES; i++) {
-        DrawRectangle(obstacles[i].position.x, obstacles[i].position.y, obstacles[i].width, obstacles[i].height,DARKGREEN);
+        DrawTexture(
+            obstacles[i].texture,
+            obstacles[i].position.x,
+            obstacles[i].position.y,
+            WHITE);
     }
 }
-int checkCollision(Ship ship) {
+
+int checkCollision(Ship ship)
+{
     // Ship's rectangle
     Rectangle shipRect = {ship.position.x, ship.position.y, 100, 100};
 
