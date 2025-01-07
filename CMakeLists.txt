@@ -44,4 +44,7 @@ if (APPLE)
     target_link_libraries(${PROJECT_NAME} "-framework OpenGL")
 endif()
 include_directories("cmake-build-debug/_deps/raylib-src")
-file(COPY assets DESTINATION ${CMAKE_BINARY_DIR})
+add_custom_target(copy_assets
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/assets ${CMAKE_CURRENT_BINARY_DIR}/assets
+)
+add_dependencies(${PROJECT_NAME} copy_assets)
