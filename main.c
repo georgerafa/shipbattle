@@ -72,7 +72,6 @@ int main(void)
     PlayMusicStream(backgroundMusic);
     SetMusicVolume(backgroundMusic, 0.5f);
 
-    Image oceanImage = LoadImage("assets/ocean.png"); //Load ocean background image
     Image oceanImage = LoadImage("assets/gameMap.png"); //Load ocean background image
     ImageResize(&oceanImage, 2048, 2048);
     oceanTexture = LoadTextureFromImage(oceanImage); //Create ocean texture
