@@ -191,7 +191,7 @@ int main(void)
         case PLAYER_SELECT: //Player selection screen
             if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) { //Navigate through options
                 PlaySound(selectionSound); // Play navigation sound
-                if (IsKeyPressed(KEY_UP) && selectedPlayers > 2) {
+                if (IsKeyPressed(KEY_UP) && selectedPlayers > 2 ) {
                     selectedPlayers--;
                 } else if (IsKeyPressed(KEY_DOWN) && selectedPlayers < MAX_PLAYERS) {
                     selectedPlayers++;
