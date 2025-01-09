@@ -27,15 +27,60 @@ Music backgroundMusic;
 Music gameMusic;
 Sound selectionSound;
 Sound confirmSound;
-
 Texture2D shipTexture;
 Texture2D gameMapTexture;
 Texture2D backgroundTexture;
 Texture2D island2Texture;
 Texture2D islandTexture;
-typedef enum GameScreen { LOGO, TITLE, PLAYER_SELECT, COUNTDOWN, GAME } GameScreen; //All screen states
+
+typedef enum GameScreen { LOGO, TITLE, PLAYER_SELECT, COUNTDOWN, GAME, SETTINGS } GameScreen; //All screen states
 GameScreen currentScreen = TITLE; //Initial screen state
 int selectedPlayers = 2;
+GameScreen previousScreen = TITLE;
+GameScreen nextScreen = PLAYER_SELECT;
+float musicVolume = 0.4f;
+float soundVolume = 0.5f;
+
+void updateSettingsMenu() {
+    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) {
+        PlaySound(selectionSound); // Play navigation sound
+        if (IsKeyPressed(KEY_UP)) {
+            musicVolume = fminf(musicVolume + 0.1f, 1.0f); // Increase music volume
+        } else if (IsKeyPressed(KEY_DOWN)) {
+            musicVolume = fmaxf(musicVolume - 0.1f, 0.0f); // Decrease music volume
+        }
+        SetMusicVolume(backgroundMusic, musicVolume);
+        SetMusicVolume(gameMusic, musicVolume);
+    }
+
+    if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT)) {
+        PlaySound(selectionSound); // Play navigation sound
+        if (IsKeyPressed(KEY_LEFT)) {
+            soundVolume = fmaxf(soundVolume - 0.1f, 0.0f); // Decrease sound volume
+        } else if (IsKeyPressed(KEY_RIGHT)) {
+            soundVolume = fminf(soundVolume + 0.1f, 1.0f); // Increase sound volume
+        }
+        SetSoundVolume(selectionSound, soundVolume);
+        SetSoundVolume(confirmSound, soundVolume);
+    }
+
+    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_ENTER)) {
+        PlaySound(confirmSound); // Confirm sound
+        currentScreen = GAME; // Return to the game
+    }
+}
+
+void drawSettingsMenu(int screenWidth, int screenHeight) {
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+
+    DrawText("SETTINGS MENU", 100, 100, 50, BLACK);
+    DrawText(TextFormat("Music Volume: %.1f (UP/DOWN)", musicVolume), 100, 200, 30, BLACK);
+    DrawText(TextFormat("Sound Volume: %.1f (LEFT/RIGHT)", soundVolume), 100, 250, 30, BLACK);
+    DrawText("Press ESC or ENTER to return to the game", 100, 350, 30, BLACK);
+
+    EndDrawing();
+}
 
 int main(void)
 {
@@ -57,6 +102,7 @@ int main(void)
     fclose(f);
 
     InitWindow(800, 800, "POLYNAYMAXIA"); //Initialize the game window
+    SetExitKey(0);
     const int display = GetCurrentMonitor(); //Get which display the game is running on
     const int screenWidth = GetMonitorWidth(display); //Get screen width
     const int screenHeight = GetMonitorHeight(display); //Get screen height
@@ -73,7 +119,7 @@ int main(void)
     SetSoundVolume(selectionSound, 0.5f);
     SetSoundVolume(confirmSound, 0.5f);
     PlayMusicStream(backgroundMusic);
-    SetMusicVolume(backgroundMusic, 0.6f);
+    SetMusicVolume(backgroundMusic, 0.4f);
 
     Image gameMapImage = LoadImage("assets/gameMap.png"); //Load ocean background image
     ImageResize(&gameMapImage, 2048, 2048);
@@ -118,6 +164,10 @@ int main(void)
             {
                 PlaySound(confirmSound); // Confirm sound
                 currentScreen = PLAYER_SELECT;
+            }else if (IsKeyPressed(KEY_ESCAPE)) { // Open settings menu
+                PlaySound(confirmSound);
+                previousScreen = TITLE;
+                currentScreen = SETTINGS;
             }
 
             BeginDrawing(); //Start rendering the screen
@@ -154,6 +204,11 @@ int main(void)
                 StopMusicStream(backgroundMusic); // Stop menu music
             }
 
+            if (IsKeyPressed(KEY_ESCAPE)) { // Open settings menu
+                PlaySound(confirmSound);
+                previousScreen = PLAYER_SELECT;
+                currentScreen = SETTINGS;
+            }
             BeginDrawing();
             ClearBackground(RAYWHITE);
 
@@ -188,11 +243,18 @@ int main(void)
             BeginDrawing();
             ClearBackground(BLACK);
             DrawText(TextFormat("%.0f", countdownTimer > 0 ? ceil(countdownTimer) : 0), screenWidth / 2 - 50, screenHeight / 2 - 50, 100, WHITE);
+            if (countdownTimer <= 0) {
+                DrawText("GO!", screenWidth / 2 - 50, screenHeight / 2 + 50, 100, GREEN);
+            }
             EndDrawing();
             break;
         case GAME: //Game screen
+            if (IsKeyPressed(KEY_ESCAPE)) {
+                PlaySound(confirmSound);
+                previousScreen = GAME;
+                currentScreen = SETTINGS; // Transition to settings menu
+            }
             updateShipPositions(ships, selectedPlayers, GetFrameTime());
-
             for (int i = 0; i < selectedPlayers; i++) {
                 Vector2 mousePosWorld = GetScreenToWorld2D(GetMousePosition(), camera);
                 //ships[i].heading = atan2f(mousePosWorld.y - ships[i].position.y, mousePosWorld.x - ships[i].position.x);
@@ -218,6 +280,16 @@ int main(void)
             EndMode2D();
             EndDrawing();
             break;
+
+            case SETTINGS:
+                updateSettingsMenu();
+            if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_ENTER)) {
+                PlaySound(confirmSound);
+                currentScreen = previousScreen; // Return to the previous screen
+            }
+            drawSettingsMenu(screenWidth, screenHeight);
+            break;
+
 
         }
     }
