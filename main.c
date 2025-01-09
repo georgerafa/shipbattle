@@ -7,13 +7,6 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-//Obstacle type definition
-typedef struct Obstacle {
-    Vector2 position;
-    Texture2D texture; // Texture for the obstacle
-    int islandType;    // The type of island based on texture used
-} Obstacle;
-
 //Create struct for saving line segments
 struct Line {
     Vector2 start;
@@ -25,13 +18,8 @@ struct CollisionSection {
     struct Line Lines[10];
 };
 
-#define MAX_OBSTACLES 8
 #define MAX_PLAYERS 6
-Obstacle obstacles[MAX_OBSTACLES]; //Array of obstacles
-
 //Declare function prototypes
-void initObstacles();
-void drawObstacles();
 int checkCollision(Ship ship, struct CollisionSection[], int sectionCount);
 
 // Sound variables
@@ -49,6 +37,8 @@ typedef enum GameScreen { LOGO, TITLE, PLAYER_SELECT, COUNTDOWN, GAME } GameScre
 GameScreen currentScreen = TITLE; //Initial screen state
 int selectedPlayers = 2;
 
+
+
 int main(void)
 {
     FILE *f = fopen("collisions.dat", "rb");
@@ -63,7 +53,7 @@ int main(void)
         perror("collisions.dat file is corrupted");
         return 0;
     }
-    struct CollisionSection readSections[length / sizeof(struct CollisionSection)];
+    struct CollisionSection readSections[length/sizeof(struct CollisionSection)];
     rewind(f);
     fread(&readSections, sizeof(readSections), 1, f);
     fclose(f);
@@ -111,14 +101,13 @@ int main(void)
     UnloadImage(shipImage); //Unload original image after creating the texture
 
     Camera2D camera = {0}; //Initialize 2D top down camera
-    camera.zoom = (screenWidth) / 2048.0f; //Set camera zoom to 1
+    camera.zoom = (screenWidth)/2048.0f; //Set camera zoom to 1
     SetTargetFPS(GetMonitorRefreshRate(display)); //Set target fps to monitor refresh rate
 
     Ship ships[MAX_PLAYERS]; //Create array for storing ships
     for (int i = 0; i < MAX_PLAYERS; i++) {
         ships[i] = (Ship){0, {1000 + (i * 120), 500}, 100, 0, 1};  // Initialize ships with offset positions
     }
-    initObstacles(); //Initialize obstacles
 
     float countdownTimer = 3.0f; // Countdown timer for 3-2-1-Go
 
@@ -195,7 +184,7 @@ int main(void)
             break;
 
         case COUNTDOWN: // Countdown screen
-            countdownTimer -= GetFrameTime();
+            countdownTimer -= GetFrameTime()*1.1;
             if (countdownTimer <= 0) {
                 currentScreen = GAME; // Transition to game screen
             }
@@ -236,6 +225,7 @@ int main(void)
                     (ships[0].heading * RAD2DEG) + 270,
                     WHITE);
             }
+
             EndMode2D();
             //DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GRAY);
             if (checkCollision(ship, readSections, length / sizeof(struct CollisionSection))) {
@@ -263,31 +253,6 @@ int main(void)
     CloseWindow();
     return 0;
 }
-
-void initObstacles()
-{
-    // Initialize obstacles by setting their position on the map and which texture to use
-    obstacles[0] = (Obstacle){{200, 100}, islandTexture, 0};
-    obstacles[1] = (Obstacle){{600, 750}, islandTexture, 0};
-    obstacles[2] = (Obstacle){{700, 70},  island2Texture, 1};
-    obstacles[3] = (Obstacle){{200, 500}, island2Texture,1};
-    obstacles[4] = (Obstacle){{1500, 600},  islandTexture, 0};
-    obstacles[5] = (Obstacle){{1150, 120},  islandTexture, 0};
-    obstacles[6] = (Obstacle){{1050, 700},  island2Texture, 1};
-    obstacles[7] = (Obstacle){{1500, 300},  island2Texture, 1};
-}
-
-void drawObstacles(){ //Draws all the obstacles in the obstacles array
-    for (int i = 0; i < MAX_OBSTACLES; i++) {
-        Obstacle obstacle = obstacles[i];
-        DrawTexture(
-            obstacle.texture,
-            obstacle.position.x,
-            obstacle.position.y,
-            WHITE);
-    }
-}
-
 
 int checkCollision(Ship ship, struct CollisionSection sections[], int sectionCount){//Checks if the provided ship is colliding with any obstacle. Returns 1 if it detects collision and 0 if it doesn't
     Vector2 shipPos = ship.position;//Position of the provided ship
