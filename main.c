@@ -2,6 +2,7 @@
 #include <math.h>
 #include "gameCalculations.h"
 #include "raymath.h"
+#include <stddef.h>
 
 //Obstacle type definition
 typedef struct Obstacle {
@@ -16,11 +17,9 @@ struct Line {
     Vector2 end;
 };
 
-
 #define MAX_OBSTACLES 8
 #define MAX_PLAYERS 6
 Obstacle obstacles[MAX_OBSTACLES]; //Array of obstacles
-
 
 const struct Line islandHitboxLines[2][20] ={ //All hitbox line segments for both island types
 {
@@ -73,6 +72,11 @@ void initObstacles();
 void drawObstacles();
 int checkCollision(Ship ship);
 
+// Sound variables
+Music backgroundMusic;
+Sound selectionSound;
+Sound confirmSound;
+
 Texture2D shipTexture;
 Texture2D oceanTexture;
 Texture2D backgroundTexture;
@@ -91,15 +95,21 @@ int main(void)
     SetWindowSize(screenWidth, screenHeight); //Set the game window size to be the same as the screen size
     ToggleFullscreen(); //Set window mode to fullscreen
 
+    // Initialize audio
+    InitAudioDevice();
+    backgroundMusic = LoadMusicStream("assets/background_music.mp3");
+    selectionSound = LoadSound("assets/selection.wav");
+    confirmSound = LoadSound("assets/confirm.wav");
+    PlayMusicStream(backgroundMusic);
+    SetMusicVolume(backgroundMusic, 0.5f);
+
     Image oceanImage = LoadImage("assets/ocean.png"); //Load ocean background image
     oceanTexture = LoadTextureFromImage(oceanImage); //Create ocean texture
     UnloadImage(oceanImage);  //Unload the original image after creating the texture
 
-
     Image backgroundImage = LoadImage("assets/background.png"); //Load main menu background image
     backgroundTexture = LoadTextureFromImage(backgroundImage); //Create main menu background texture
     UnloadImage(backgroundImage);  // Unload the original image after creating the texture
-
 
     Image islandImage = LoadImage("assets/island.png"); //Load island type 0 image
     ImageResize(&islandImage, 250, 250); //Resize image
@@ -127,17 +137,19 @@ int main(void)
 
     while (!WindowShouldClose()) //While the window open
     {
+        UpdateMusicStream(backgroundMusic); // Update music stream
+
         switch (currentScreen) //Change what is displayed based on current screen state
         {
-            case TITLE: //Startup scren
+            case TITLE: //Startup screen
                 if (IsKeyPressed(KEY_ENTER) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) //If enter is pressed or LMB is clicked move to player selection screen
                 {
+                    PlaySound(confirmSound); // Confirm sound
                     currentScreen = PLAYER_SELECT;
                 }
 
                 BeginDrawing(); //Start rendering the screen
                 ClearBackground(RAYWHITE); //Clear the background
-
 
                 DrawTexturePro( //Draw the background texture
                 backgroundTexture,
@@ -147,7 +159,7 @@ int main(void)
                 0.0f,
                 WHITE);
                 //Write some text on the screen
-                DrawText("Welcome to Mononaumaxia!", 100, 100, 50, WHITE);
+                DrawText("Welcome to Polunaumaxia!", 100, 100, 50, WHITE);
                 DrawText("Press ENTER or click to start", 100, 200, 30, WHITE);
 
                 EndDrawing();//Stop drawing screen
@@ -155,6 +167,7 @@ int main(void)
 
             case PLAYER_SELECT: //Player selection screen
                 if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) { //Navigate through options
+                    PlaySound(selectionSound); // Play navigation sound
                     if (IsKeyPressed(KEY_UP) && selectedPlayers > 1) {
                         selectedPlayers--;
                     } else if (IsKeyPressed(KEY_DOWN) && selectedPlayers < MAX_PLAYERS) {
@@ -163,6 +176,7 @@ int main(void)
                 }
 
                 if (IsKeyPressed(KEY_ENTER)) {//If enter is pressed start game
+                    PlaySound(confirmSound); // Confirm sound
                     currentScreen = GAME;
                 }
 
@@ -192,7 +206,6 @@ int main(void)
                 break;
 
             case GAME: //Game screen
-                //Im not commenting these they will change
                 updateShipPositions(ships, selectedPlayers, GetFrameTime());
                 for (int i = 0; i < selectedPlayers; i++) {
                     Vector2 mousePosWorld = GetScreenToWorld2D(GetMousePosition(), camera);
@@ -204,7 +217,6 @@ int main(void)
 
                 BeginDrawing();
                 ClearBackground(DARKBLUE);
-
 
                 BeginMode2D(camera);
 
@@ -235,6 +247,13 @@ int main(void)
     UnloadTexture(islandTexture);
     UnloadTexture(island2Texture);
     UnloadTexture(shipTexture);
+
+    // Unload audio resources
+    UnloadMusicStream(backgroundMusic);
+    UnloadSound(selectionSound);
+    UnloadSound(confirmSound);
+    CloseAudioDevice();
+
     //Close the window
     CloseWindow();
     return 0;
@@ -264,7 +283,6 @@ void drawObstacles(){ //Draws all the obstacles in the obstacles array
     }
 }
 
-
 int checkCollision(Ship ship){//Checks if the provided ship is colliding with any obstacle. Returns 1 if it detects collision and 0 if it doesn't
     Vector2 shipPos = ship.position;//Position of the provided ship
     struct Line shipLines[4] = { //The line segments that make up the hitbox of the ship
@@ -285,28 +303,14 @@ int checkCollision(Ship ship){//Checks if the provided ship is colliding with an
             {40*cos(ship.heading)+15*sin(ship.heading)+shipPos.x, 40*sin(ship.heading)-15*cos(ship.heading)+shipPos.y}
         }
     };
-    for (int i = 0; i < MAX_OBSTACLES; i++) {//Iterate through all obstacles
-        Obstacle obstacle = obstacles[i]; //Current obstacle
-        Vector2 obPos = obstacle.position; //Obstacle offset from (0,0)
-        //If the distance, between the ship and the obstacle, is less than 200 pixels check for collision
-        if(Vector2Length(Vector2Subtract(Vector2Add(obstacle.position, (Vector2){obstacle.texture.width/2, obstacle.texture.height/2}),ship.position)) < 200) {
-            //Iterate through island hitbox lines
-            for (int j = 0; j<20; j++) {
-                //Temporary collision point variable
-                Vector2 colP;
-                //Iterate through ship hitbox lines
-                for (int k = 0; k<4; k++) {
-                    //If there is a collision between the island and ship lines then return 1
-                    if (CheckCollisionLines(
-                    Vector2Add(islandHitboxLines[obstacle.islandType][j].start, obPos), //Island line start point
-                    Vector2Add(islandHitboxLines[obstacle.islandType][j].end, obPos), //Island line end point
-                    shipLines[k].start, //Ship line start point
-                    shipLines[k].end, //Ship line end point
-                        &colP)) //Collision point variable
-                        return 1;
-                }
+    for (int i = 0; i < MAX_OBSTACLES; i++) { //Check each obstacle
+        struct Line hitbox = islandHitboxLines[obstacles[i].islandType][0];
+        for (int j = 0; (hitbox.start.x != 0 || hitbox.start.y != 0) && (hitbox.end.x != 0 || hitbox.end.y != 0); j++) { //Loop through all the hitboxes of the obstacle
+            hitbox = islandHitboxLines[obstacles[i].islandType][j];
+            for (int k = 0; k < 4; k++) { //Loop through all the hitboxes of the ship
+                if (CheckCollisionLines(shipLines[k].start, shipLines[k].end, (Vector2){hitbox.start.x+obstacles[i].position.x, hitbox.start.y+obstacles[i].position.y}, (Vector2){hitbox.end.x+obstacles[i].position.x, hitbox.end.y+obstacles[i].position.y}, NULL)) return 1; //Check if the two lines are intersecting
             }
         }
     }
-    return 0; //Return 0 if no collision is detected
+    return 0;
 }
