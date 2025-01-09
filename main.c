@@ -5,6 +5,7 @@
 #include "gameCalculations.h"
 #include "raymath.h"
 #include <stddef.h>
+#include <stdlib.h>
 
 //Obstacle type definition
 typedef struct Obstacle {
@@ -50,12 +51,23 @@ int selectedPlayers = 2;
 int main(void)
 {
     FILE *f = fopen("collisions.dat", "rb");
+
+    if (f == NULL) {
+        perror("collisions.dat file is missing");
+        return 0;
+    }
     fseek(f, 0, SEEK_END);
     int length = ftell(f);
-    struct CollisionSection readSections[length];
+    if (length <=0 ) {
+        perror("collisions.dat file is corrupted");
+        return 0;
+    }
+    struct CollisionSection readSections[length/sizeof(struct CollisionSection)];
     rewind(f);
     fread(&readSections, sizeof(readSections), 1, f);
     fclose(f);
+
+
 
     InitWindow(800, 800, "POLYNAYMAXIA"); //Initialize the game window
     const int display = GetCurrentMonitor(); //Get which display the game is running on
