@@ -5,7 +5,7 @@
 #include "raymath.h"
 typedef struct ShipStruct Ship;
 typedef struct ProjectileStruct Projectile;
-const float PROJECTILE_SPEED = 150.0f; //The initial projectile speed
+const float PROJECTILE_SPEED = 200.0f; //The initial projectile speed
 const float GRAVITY = 45.0f; //Gravitational acceleration
 #define MAX_PLAYERS 6
 struct SpawnPosition {
@@ -62,10 +62,10 @@ void initializeProjectiles(Projectile *projectiles, int projectileCount) { //Ini
 }
 
 //Update the projectiles' speeds and positions while also applying gravity
-void updateProjectiles(Projectile *projectiles, int projectileCount, float deltaT) {
+void updateProjectiles(Projectile *projectiles, Ship *ships, int projectileCount, float deltaT) {
     for (int i = 0; i < projectileCount; i++) {
         Projectile projectile = projectiles[i];
-        if (projectiles[i].position.z > 0) {
+        if (projectiles[i].position.z > 0 && ships[i].isAlive==1) {
             projectiles[i].position = (Vector3){projectile.position.x+projectile.speed.x*deltaT, projectile.position.y+projectile.speed.y*deltaT, projectile.position.z+projectile.speed.z*deltaT};
             projectiles[i].speed.z -= GRAVITY*deltaT;
         }

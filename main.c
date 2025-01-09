@@ -10,7 +10,7 @@
 float countdownTimer = 3.0f; // Countdown timer for 3-2-1-Go
 float roundTimer = 10.0f;
 typedef enum GameState {DIRECTION_INSTR, MOVEMENT_A, FIRE_INSTR, MOVEMENT_B, FIRE} GameState;
-typedef enum GameScreen {TITLE, PLAYER_SELECT, COUNTDOWN, GAME } GameScreen; //All screen states
+typedef enum GameScreen {TITLE, PLAYER_SELECT, COUNTDOWN, GAME, SETTINGS } GameScreen; //All screen states
 
 struct Line {
     Vector2 start;
@@ -23,7 +23,7 @@ struct CollisionSection {
 };
 //Declare function prototypes
 int checkCollision(Ship ship, struct CollisionSection[], int sectionCount);
-
+int checkProjectileCollision(Ship ship, Projectile projectiles[]);
 // Sound variables
 Music backgroundMusic;
 Music gameMusic;
@@ -83,7 +83,7 @@ void drawSettingsMenu(int screenWidth, int screenHeight) {
     EndDrawing();
 }
 
-int main(void)
+void main(void)
 {
     FILE *f = fopen("collisions.dat", "rb");
 
@@ -271,6 +271,9 @@ int main(void)
                 case MOVEMENT_A: {
                     updateShipPositions(ships, selectedPlayers, GetFrameTime());
                     roundTimer -=GetFrameTime();
+                    for (int i = 0; i < selectedPlayers; i++) {
+                        ships[i].isAlive = (1 - checkCollision(ships[i], readSections, length/sizeof(struct CollisionSection)))*ships[i].isAlive;
+                    }
                     if (roundTimer <= 5) {
                         currentState = FIRE_INSTR;
                         posBuffer = ships[0].position;
@@ -282,6 +285,7 @@ int main(void)
                     selectAnimation = fmod(selectAnimation + GetFrameTime()*M_PI, M_PI*2);
                     Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), camera);
                     projectiles[picking].heading = atan2(mousePos.y-ships[picking].position.y, mousePos.x-ships[picking].position.x);
+                    DrawRectangle(20, screenHeight - 20, screenWidth-40, 20, (Color){255,255,255,128});
                     if (picking >= selectedPlayers) {
                         currentState = MOVEMENT_B;
                         picking = 0;
@@ -305,6 +309,9 @@ int main(void)
                 case MOVEMENT_B: {
                     updateShipPositions(ships, selectedPlayers, GetFrameTime());
                     roundTimer -=GetFrameTime();
+                    for (int i = 0; i < selectedPlayers; i++) {
+                        ships[i].isAlive = (1 - checkCollision(ships[i], readSections, length/sizeof(struct CollisionSection)))*ships[i].isAlive;
+                    }
                     if (roundTimer <= 0) {
                         currentState = FIRE;
                         initializeProjectiles(projectiles, selectedPlayers);
@@ -312,7 +319,10 @@ int main(void)
                     break;
                 }
                 case FIRE: {
-                    updateProjectiles(projectiles, selectedPlayers, GetFrameTime());
+                    updateProjectiles(projectiles, ships, selectedPlayers, GetFrameTime());
+                    for (int i = 0; i<selectedPlayers; i++) {
+                        ships[i].isAlive = (1-checkProjectileCollision(ships[i], projectiles))*ships[i].isAlive;
+                    }
                 }
 
             }
@@ -336,7 +346,7 @@ int main(void)
 
 
                 }
-                if (currentState == FIRE) DrawCircle(projectiles[i].position.x, projectiles[i].position.y, 5+0.05*projectiles[i].position.z, WHITE);
+                if (currentState == FIRE&&projectiles[i].position.z>0&&ships[i].isAlive==1) DrawCircle(projectiles[i].position.x, projectiles[i].position.y, 5+0.05*projectiles[i].position.z, WHITE);
             }
 
 
@@ -371,6 +381,37 @@ int main(void)
 
     //Close the window
     CloseWindow();
+}
+
+int checkProjectileCollision(Ship ship, Projectile projectiles[]) {
+    Vector2 shipPos = ship.position;//Position of the provided ship
+    struct Line shipLines[4] = { //The line segments that make up the hitbox of the ship
+        {
+            {(-40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x),(-40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)},
+           {(40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x),(40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)}
+        },
+        {
+                {(-40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (-40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)},
+                {(40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)}
+        },
+        {
+                {(-40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x), (-40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)},
+                {(-40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (-40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)}
+        },
+        {
+                {40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y},
+                {(40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)}
+        }
+    };
+    for (int i = 0; i < selectedPlayers; i++) {
+        Projectile projectile = projectiles[i];
+        for (int j = 0; j < 4; j++) {
+            if (CheckCollisionCircleLine((Vector2){projectile.position.x, projectile.position.y}, 15, shipLines[i].start, shipLines[i].end)&&projectile.position.z<15&&projectile.team!=ship.team) {
+                return 1;
+            }
+        }
+    }
+    return 0;
 }
 
 int checkCollision(Ship ship, struct CollisionSection sections[], int sectionCount){//Checks if the provided ship is colliding with any obstacle. Returns 1 if it detects collision and 0 if it doesn't
