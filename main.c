@@ -6,6 +6,7 @@
 #include "raymath.h"
 #include <stddef.h>
 #include <stdlib.h>
+#define MAX_PLAYERS 6
 
 //Create struct for saving line segments
 struct Line {
@@ -18,7 +19,6 @@ struct CollisionSection {
     struct Line Lines[10];
 };
 
-#define MAX_PLAYERS 6
 //Declare function prototypes
 int checkCollision(Ship ship, struct CollisionSection[], int sectionCount);
 
@@ -29,15 +29,13 @@ Sound selectionSound;
 Sound confirmSound;
 
 Texture2D shipTexture;
-Texture2D oceanTexture;
+Texture2D gameMapTexture;
 Texture2D backgroundTexture;
 Texture2D island2Texture;
 Texture2D islandTexture;
 typedef enum GameScreen { LOGO, TITLE, PLAYER_SELECT, COUNTDOWN, GAME } GameScreen; //All screen states
 GameScreen currentScreen = TITLE; //Initial screen state
 int selectedPlayers = 2;
-
-
 
 int main(void)
 {
@@ -77,10 +75,10 @@ int main(void)
     PlayMusicStream(backgroundMusic);
     SetMusicVolume(backgroundMusic, 0.6f);
 
-    Image oceanImage = LoadImage("assets/gameMap.png"); //Load ocean background image
-    ImageResize(&oceanImage, 2048, 2048);
-    oceanTexture = LoadTextureFromImage(oceanImage); //Create ocean texture
-    UnloadImage(oceanImage);  //Unload the original image after creating the texture
+    Image gameMapImage = LoadImage("assets/gameMap.png"); //Load ocean background image
+    ImageResize(&gameMapImage, 2048, 2048);
+    gameMapTexture = LoadTextureFromImage(gameMapImage); //Create ocean texture
+    UnloadImage(gameMapImage);  //Unload the original image after creating the texture
 
     Image backgroundImage = LoadImage("assets/background.png"); //Load main menu background image
     backgroundTexture = LoadTextureFromImage(backgroundImage); //Create main menu background texture
@@ -105,9 +103,6 @@ int main(void)
     SetTargetFPS(GetMonitorRefreshRate(display)); //Set target fps to monitor refresh rate
 
     Ship ships[MAX_PLAYERS]; //Create array for storing ships
-    for (int i = 0; i < MAX_PLAYERS; i++) {
-        ships[i] = (Ship){0, {1000 + (i * 120), 500}, 100, 0, 1};  // Initialize ships with offset positions
-    }
 
     float countdownTimer = 3.0f; // Countdown timer for 3-2-1-Go
 
@@ -187,6 +182,7 @@ int main(void)
             countdownTimer -= GetFrameTime()*1.1;
             if (countdownTimer <= 0) {
                 currentScreen = GAME; // Transition to game screen
+                initializeShips(ships, selectedPlayers);
             }
 
             BeginDrawing();
@@ -194,49 +190,39 @@ int main(void)
             DrawText(TextFormat("%.0f", countdownTimer > 0 ? ceil(countdownTimer) : 0), screenWidth / 2 - 50, screenHeight / 2 - 50, 100, WHITE);
             EndDrawing();
             break;
-
         case GAME: //Game screen
             updateShipPositions(ships, selectedPlayers, GetFrameTime());
+
             for (int i = 0; i < selectedPlayers; i++) {
                 Vector2 mousePosWorld = GetScreenToWorld2D(GetMousePosition(), camera);
-                ships[i].heading = atan2f(mousePosWorld.y - ships[i].position.y, mousePosWorld.x - ships[i].position.x);
-            }
-            for (int i = 0; i < selectedPlayers; i++) {
-                //ships[i].isAlive = 1 - checkCollision(ships[i]);
+                //ships[i].heading = atan2f(mousePosWorld.y - ships[i].position.y, mousePosWorld.x - ships[i].position.x);
             }
 
             BeginDrawing();
             ClearBackground(DARKBLUE);
 
             BeginMode2D(camera);
-
-            DrawTexture(oceanTexture, 0, 0, WHITE);
-
-            //drawObstacles();
-            Ship ship = ships[0];
-            // Draw the ship
-            if (ship.isAlive) {
-                //checkCollision(ships[0]);
-                DrawTexturePro(
-                    shipTexture,
-                    (Rectangle){0, 0, shipTexture.width, shipTexture.height},
-                    (Rectangle){ship.position.x, ship.position.y, 100, 100},
-                    (Vector2){50, 50},
-                    (ships[0].heading * RAD2DEG) + 270,
-                    WHITE);
+            DrawTexture(gameMapTexture, 0, 0, WHITE);
+            for (int i = 0; i < selectedPlayers; i++) {
+                Ship ship = ships[i];
+                if (ship.isAlive) {
+                    DrawTexturePro(
+                        shipTexture,
+                        (Rectangle){0, 0, (float)shipTexture.width, (float)shipTexture.height},
+                        (Rectangle){ship.position.x, ship.position.y, 100, 100},
+                        (Vector2){50, 50},
+                        ((float)ship.heading * RAD2DEG) + 270,
+                        WHITE);
+                }
             }
-
             EndMode2D();
-            //DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GRAY);
-            if (checkCollision(ship, readSections, length / sizeof(struct CollisionSection))) {
-                DrawText("COLLISION", 10, 10, 30, RED);
-            }
             EndDrawing();
             break;
+
         }
     }
     //Unload all textures
-    UnloadTexture(oceanTexture);
+    UnloadTexture(gameMapTexture);
     UnloadTexture(backgroundTexture);
     UnloadTexture(islandTexture);
     UnloadTexture(island2Texture);

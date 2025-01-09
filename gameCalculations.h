@@ -19,5 +19,5 @@ typedef struct ProjectileStruct {
 void updateShipPositions(Ship *ships, int shipCount, double deltaT);
 void updateProjectiles(Projectile *projectiles, int projectileCount, double deltaT);
 void initializeProjectiles(Projectile *projectiles, int projectileCount);
-
+void initializeShips(Ship *ships, int shipCount);
 #endif //GAMECALCULATIONS_H
