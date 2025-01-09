@@ -183,6 +183,7 @@ int main(void)
             //Write some text on the screen
             DrawText("Welcome to Polunaumaxia!", 100, 100, 50, WHITE);
             DrawText("Press ENTER or click to start", 100, 200, 30, WHITE);
+            DrawText("Press ESC for options", 100, 250, 30, WHITE);
 
             EndDrawing();//Stop drawing screen
             break;
@@ -190,7 +191,7 @@ int main(void)
         case PLAYER_SELECT: //Player selection screen
             if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) { //Navigate through options
                 PlaySound(selectionSound); // Play navigation sound
-                if (IsKeyPressed(KEY_UP) && selectedPlayers > 1) {
+                if (IsKeyPressed(KEY_UP) && selectedPlayers > 2) {
                     selectedPlayers--;
                 } else if (IsKeyPressed(KEY_DOWN) && selectedPlayers < MAX_PLAYERS) {
                     selectedPlayers++;
