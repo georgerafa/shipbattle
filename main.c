@@ -1,5 +1,7 @@
 #include "raylib.h"
 #include <math.h>
+#include <stdio.h>
+
 #include "gameCalculations.h"
 #include "raymath.h"
 #include <stddef.h>
@@ -16,61 +18,20 @@ struct Line {
     Vector2 start;
     Vector2 end;
 };
+struct CollisionSection {
+    Vector2 centerPosition;
+    int minimumDistance;
+    struct Line Lines[10];
+};
 
 #define MAX_OBSTACLES 8
 #define MAX_PLAYERS 6
 Obstacle obstacles[MAX_OBSTACLES]; //Array of obstacles
 
-const struct Line islandHitboxLines[2][20] ={ //All hitbox line segments for both island types
-{
-    {{66,12},{1,82}},
-    {{1,82},{2,125}},
-    {{2,125},{17,146}},
-    {{17,146},{27,180}},
-    {{27,180},{88,177}},
-    {{88,177},{118,214}},
-    {{118,214},{102,237}},
-    {{102,237},{119,253}},
-    {{119,253},{162,223}},
-    {{162,223},{144,191}},
-    {{144,191},{191,168}},
-    {{191,168},{217,192}},
-    {{217,192},{242,159}},
-    {{242,159},{243,134}},
-    {{243,134},{228,111}},
-    {{228,111},{221,80}},
-    {{221,80},{205,58}},
-    {{205,58},{128,1}},
-    {{128,1},{66,12}},
-    {{0,0}, {0,0}},
-    },{
-    {{72,1},{48,26}},
-    {{48,26},{29,70}},
-    {{29,70},{9,85}},
-    {{9,85},{0,126}},
-    {{0,126},{13,153}},
-    {{13,153},{57,178}},
-    {{57,178},{76,174}},
-    {{76,174},{153,249}},
-    {{153,249},{228,179}},
-    {{228,179},{250,133}},
-    {{250,133},{219,62}},
-    {{219,62},{173,32}},
-    {{173,32},{132,26}},
-    {{132,26},{111,35}},
-    {{111,35},{72,1}},
-    {{0,0}, {0,0}},
-    {{0,0}, {0,0}},
-    {{0,0}, {0,0}},
-    {{0,0}, {0,0}},
-    {{0,0}, {0,0}}
-    }
-};
-
 //Declare function prototypes
 void initObstacles();
 void drawObstacles();
-int checkCollision(Ship ship);
+int checkCollision(Ship ship, struct CollisionSection[], int sectionCount);
 
 // Sound variables
 Music backgroundMusic;
@@ -88,6 +49,14 @@ int selectedPlayers = 2;
 
 int main(void)
 {
+    FILE *f = fopen("collisions.dat", "rb");
+    fseek(f, 0, SEEK_END);
+    int length = ftell(f);
+    struct CollisionSection readSections[length];
+    rewind(f);
+    fread(&readSections, sizeof(readSections), 1, f);
+    fclose(f);
+
     InitWindow(800, 800, "POLYNAYMAXIA"); //Initialize the game window
     const int display = GetCurrentMonitor(); //Get which display the game is running on
     const int screenWidth = GetMonitorWidth(display); //Get screen width
@@ -104,12 +73,16 @@ int main(void)
     SetMusicVolume(backgroundMusic, 0.5f);
 
     Image oceanImage = LoadImage("assets/ocean.png"); //Load ocean background image
+    Image oceanImage = LoadImage("assets/gameMap.png"); //Load ocean background image
+    ImageResize(&oceanImage, 2048, 2048);
     oceanTexture = LoadTextureFromImage(oceanImage); //Create ocean texture
     UnloadImage(oceanImage);  //Unload the original image after creating the texture
+
 
     Image backgroundImage = LoadImage("assets/background.png"); //Load main menu background image
     backgroundTexture = LoadTextureFromImage(backgroundImage); //Create main menu background texture
     UnloadImage(backgroundImage);  // Unload the original image after creating the texture
+
 
     Image islandImage = LoadImage("assets/island.png"); //Load island type 0 image
     ImageResize(&islandImage, 250, 250); //Resize image
@@ -126,7 +99,7 @@ int main(void)
     UnloadImage(shipImage); //Unload original image after creating the texture
 
     Camera2D camera = {0}; //Initialize 2D top down camera
-    camera.zoom = 1; //Set camera zoom to 1
+    camera.zoom = (screenWidth)/2048.0f; //Set camera zoom to 1
     SetTargetFPS(GetMonitorRefreshRate(display)); //Set target fps to monitor refresh rate
 
     Ship ships[MAX_PLAYERS]; //Create array for storing ships
@@ -212,7 +185,7 @@ int main(void)
                     ships[i].heading = atan2f(mousePosWorld.y - ships[i].position.y, mousePosWorld.x - ships[i].position.x);
                 }
                 for (int i = 0; i < selectedPlayers; i++) {
-                    ships[i].isAlive = 1 - checkCollision(ships[i]);
+                    //ships[i].isAlive = 1 - checkCollision(ships[i]);
                 }
 
                 BeginDrawing();
@@ -222,11 +195,11 @@ int main(void)
 
                 DrawTexture(oceanTexture, 0, 0, WHITE);
 
-                drawObstacles();
+                //drawObstacles();
                 Ship ship = ships[0];
                 // Draw the ship
                 if (ship.isAlive) {
-                    checkCollision(ships[0]);
+                    //checkCollision(ships[0]);
                     DrawTexturePro(
                     shipTexture,
                     (Rectangle){0, 0, shipTexture.width, shipTexture.height},
@@ -236,7 +209,10 @@ int main(void)
                     WHITE);
                 }
                 EndMode2D();
-                DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GRAY);
+                //DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GRAY);
+                if (checkCollision(ship, readSections, length/sizeof(struct CollisionSection))) {
+                   DrawText("COLLISION", 10, 10, 30, RED);
+                }
                 EndDrawing();
                 break;
         }
@@ -283,7 +259,8 @@ void drawObstacles(){ //Draws all the obstacles in the obstacles array
     }
 }
 
-int checkCollision(Ship ship){//Checks if the provided ship is colliding with any obstacle. Returns 1 if it detects collision and 0 if it doesn't
+
+int checkCollision(Ship ship, struct CollisionSection sections[], int sectionCount){//Checks if the provided ship is colliding with any obstacle. Returns 1 if it detects collision and 0 if it doesn't
     Vector2 shipPos = ship.position;//Position of the provided ship
     struct Line shipLines[4] = { //The line segments that make up the hitbox of the ship
         {
@@ -303,14 +280,28 @@ int checkCollision(Ship ship){//Checks if the provided ship is colliding with an
             {40*cos(ship.heading)+15*sin(ship.heading)+shipPos.x, 40*sin(ship.heading)-15*cos(ship.heading)+shipPos.y}
         }
     };
-    for (int i = 0; i < MAX_OBSTACLES; i++) { //Check each obstacle
-        struct Line hitbox = islandHitboxLines[obstacles[i].islandType][0];
-        for (int j = 0; (hitbox.start.x != 0 || hitbox.start.y != 0) && (hitbox.end.x != 0 || hitbox.end.y != 0); j++) { //Loop through all the hitboxes of the obstacle
-            hitbox = islandHitboxLines[obstacles[i].islandType][j];
-            for (int k = 0; k < 4; k++) { //Loop through all the hitboxes of the ship
-                if (CheckCollisionLines(shipLines[k].start, shipLines[k].end, (Vector2){hitbox.start.x+obstacles[i].position.x, hitbox.start.y+obstacles[i].position.y}, (Vector2){hitbox.end.x+obstacles[i].position.x, hitbox.end.y+obstacles[i].position.y}, NULL)) return 1; //Check if the two lines are intersecting
+    for (int i = 0; i < sectionCount; i++) {//Iterate through all obstacles
+        struct CollisionSection section = sections[i]; //Current obstacle
+        Vector2 centerPos = section.centerPosition; //Obstacle offset from (0,0)
+        //If the distance, between the ship and the obstacle, is less than 200 pixels check for collision
+        if(Vector2Length(Vector2Subtract(centerPos,ship.position)) < section.minimumDistance) {
+            //Iterate through section hitbox lines
+            for (int j = 0; j<10; j++) {
+                //Temporary collision point variable
+                Vector2 colP;
+                //Iterate through ship hitbox lines
+                for (int k = 0; k<4; k++) {
+                    //If there is a collision between the terrain and ship lines then return 1
+                    if (CheckCollisionLines(
+                    section.Lines[j].start, //Island line start point
+                    section.Lines[j].end, //Island line end point
+                    shipLines[k].start, //Ship line start point
+                    shipLines[k].end, //Ship line end point
+                        &colP)) //Collision point variable
+                        return 1;
+                }
             }
         }
     }
-    return 0;
+    return 0; //Return 0 if no collision is detected
 }
