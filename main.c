@@ -11,7 +11,7 @@
 typedef struct Obstacle {
     Vector2 position;
     Texture2D texture; // Texture for the obstacle
-    int islandType; //The type of island based on texture used
+    int islandType;    // The type of island based on texture used
 } Obstacle;
 
 //Create struct for saving line segments
@@ -36,6 +36,7 @@ int checkCollision(Ship ship, struct CollisionSection[], int sectionCount);
 
 // Sound variables
 Music backgroundMusic;
+Music gameMusic;
 Sound selectionSound;
 Sound confirmSound;
 
@@ -44,7 +45,7 @@ Texture2D oceanTexture;
 Texture2D backgroundTexture;
 Texture2D island2Texture;
 Texture2D islandTexture;
-typedef enum GameScreen { LOGO, TITLE, PLAYER_SELECT, GAME } GameScreen; //All screen states
+typedef enum GameScreen { LOGO, TITLE, PLAYER_SELECT, COUNTDOWN, GAME } GameScreen; //All screen states
 GameScreen currentScreen = TITLE; //Initial screen state
 int selectedPlayers = 2;
 
@@ -58,16 +59,14 @@ int main(void)
     }
     fseek(f, 0, SEEK_END);
     int length = ftell(f);
-    if (length <=0 ) {
+    if (length <= 0) {
         perror("collisions.dat file is corrupted");
         return 0;
     }
-    struct CollisionSection readSections[length/sizeof(struct CollisionSection)];
+    struct CollisionSection readSections[length / sizeof(struct CollisionSection)];
     rewind(f);
     fread(&readSections, sizeof(readSections), 1, f);
     fclose(f);
-
-
 
     InitWindow(800, 800, "POLYNAYMAXIA"); //Initialize the game window
     const int display = GetCurrentMonitor(); //Get which display the game is running on
@@ -79,21 +78,23 @@ int main(void)
     // Initialize audio
     InitAudioDevice();
     backgroundMusic = LoadMusicStream("assets/background_music.mp3");
+    gameMusic = LoadMusicStream("assets/game_music.mp3");
     selectionSound = LoadSound("assets/selection.wav");
     confirmSound = LoadSound("assets/confirm.wav");
+    SetMusicVolume(gameMusic,0.2f);
+    SetSoundVolume(selectionSound, 0.5f);
+    SetSoundVolume(confirmSound, 0.5f);
     PlayMusicStream(backgroundMusic);
-    SetMusicVolume(backgroundMusic, 0.5f);
+    SetMusicVolume(backgroundMusic, 0.6f);
 
     Image oceanImage = LoadImage("assets/gameMap.png"); //Load ocean background image
     ImageResize(&oceanImage, 2048, 2048);
     oceanTexture = LoadTextureFromImage(oceanImage); //Create ocean texture
     UnloadImage(oceanImage);  //Unload the original image after creating the texture
 
-
     Image backgroundImage = LoadImage("assets/background.png"); //Load main menu background image
     backgroundTexture = LoadTextureFromImage(backgroundImage); //Create main menu background texture
     UnloadImage(backgroundImage);  // Unload the original image after creating the texture
-
 
     Image islandImage = LoadImage("assets/island.png"); //Load island type 0 image
     ImageResize(&islandImage, 250, 250); //Resize image
@@ -110,7 +111,7 @@ int main(void)
     UnloadImage(shipImage); //Unload original image after creating the texture
 
     Camera2D camera = {0}; //Initialize 2D top down camera
-    camera.zoom = (screenWidth)/2048.0f; //Set camera zoom to 1
+    camera.zoom = (screenWidth) / 2048.0f; //Set camera zoom to 1
     SetTargetFPS(GetMonitorRefreshRate(display)); //Set target fps to monitor refresh rate
 
     Ship ships[MAX_PLAYERS]; //Create array for storing ships
@@ -119,113 +120,129 @@ int main(void)
     }
     initObstacles(); //Initialize obstacles
 
+    float countdownTimer = 3.0f; // Countdown timer for 3-2-1-Go
+
     while (!WindowShouldClose()) //While the window open
     {
-        UpdateMusicStream(backgroundMusic); // Update music stream
+        UpdateMusicStream(backgroundMusic);
+        UpdateMusicStream(gameMusic);
 
         switch (currentScreen) //Change what is displayed based on current screen state
         {
-            case TITLE: //Startup screen
-                if (IsKeyPressed(KEY_ENTER) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) //If enter is pressed or LMB is clicked move to player selection screen
-                {
-                    PlaySound(confirmSound); // Confirm sound
-                    currentScreen = PLAYER_SELECT;
-                }
+        case TITLE: //Startup screen
+            if (IsKeyPressed(KEY_ENTER) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) //If enter is pressed or LMB is clicked move to player selection screen
+            {
+                PlaySound(confirmSound); // Confirm sound
+                currentScreen = PLAYER_SELECT;
+            }
 
-                BeginDrawing(); //Start rendering the screen
-                ClearBackground(RAYWHITE); //Clear the background
+            BeginDrawing(); //Start rendering the screen
+            ClearBackground(RAYWHITE); //Clear the background
 
-                DrawTexturePro( //Draw the background texture
+            DrawTexturePro( //Draw the background texture
                 backgroundTexture,
                 (Rectangle){0, 0, backgroundTexture.width, backgroundTexture.height},
                 (Rectangle){0, 0, screenWidth, screenHeight},
                 (Vector2){0, 0},
                 0.0f,
                 WHITE);
-                //Write some text on the screen
-                DrawText("Welcome to Polunaumaxia!", 100, 100, 50, WHITE);
-                DrawText("Press ENTER or click to start", 100, 200, 30, WHITE);
+            //Write some text on the screen
+            DrawText("Welcome to Polunaumaxia!", 100, 100, 50, WHITE);
+            DrawText("Press ENTER or click to start", 100, 200, 30, WHITE);
 
-                EndDrawing();//Stop drawing screen
-                break;
+            EndDrawing();//Stop drawing screen
+            break;
 
-            case PLAYER_SELECT: //Player selection screen
-                if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) { //Navigate through options
-                    PlaySound(selectionSound); // Play navigation sound
-                    if (IsKeyPressed(KEY_UP) && selectedPlayers > 1) {
-                        selectedPlayers--;
-                    } else if (IsKeyPressed(KEY_DOWN) && selectedPlayers < MAX_PLAYERS) {
-                        selectedPlayers++;
-                    }
+        case PLAYER_SELECT: //Player selection screen
+            if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) { //Navigate through options
+                PlaySound(selectionSound); // Play navigation sound
+                if (IsKeyPressed(KEY_UP) && selectedPlayers > 1) {
+                    selectedPlayers--;
+                } else if (IsKeyPressed(KEY_DOWN) && selectedPlayers < MAX_PLAYERS) {
+                    selectedPlayers++;
                 }
+            }
 
-                if (IsKeyPressed(KEY_ENTER)) {//If enter is pressed start game
-                    PlaySound(confirmSound); // Confirm sound
-                    currentScreen = GAME;
-                }
+            if (IsKeyPressed(KEY_ENTER)) { //If enter is pressed, transition to countdown
+                PlaySound(confirmSound); // Confirm sound
+                currentScreen = COUNTDOWN;
+                PlayMusicStream(gameMusic); // Start game music
+                StopMusicStream(backgroundMusic); // Stop menu music
+            }
 
-                BeginDrawing();
-                ClearBackground(RAYWHITE);
+            BeginDrawing();
+            ClearBackground(RAYWHITE);
 
-                DrawTexturePro(
+            DrawTexturePro(
                 backgroundTexture,
                 (Rectangle){0, 0, backgroundTexture.width, backgroundTexture.height},
                 (Rectangle){0, 0, screenWidth, screenHeight},
-                (Vector2){0, 0},0.0f,
-                WHITE
-                );
-                //Draw navigation instructions on screen
-                DrawText("Select Number of Players (2 to 6)", 100, 100, 40, WHITE);
-                DrawText("Press UP/DOWN arrows to choose", 100, 160, 30, WHITE);
-                DrawText("Press ENTER to start", 100, 200, 30, WHITE);
-                //Draw possible options
-                for (int i = 2; i <= MAX_PLAYERS; i++) {
-                    if (i == selectedPlayers) {
-                        DrawText(TextFormat("> %d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 1) * 40, 40, GREEN);
-                    } else {
-                        DrawText(TextFormat("%d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 1) * 40, 40, WHITE);
-                    }
+                (Vector2){0, 0}, 0.0f,
+                WHITE);
+            //Draw navigation instructions on screen
+            DrawText("Select Number of Players (2 to 6)", 100, 100, 40, WHITE);
+            DrawText("Press UP/DOWN arrows to choose", 100, 160, 30, WHITE);
+            DrawText("Press ENTER to start", 100, 200, 30, WHITE);
+            //Draw possible options
+            for (int i = 2; i <= MAX_PLAYERS; i++) {
+                if (i == selectedPlayers) {
+                    DrawText(TextFormat("> %d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 1) * 40, 40, GREEN);
+                } else {
+                    DrawText(TextFormat("%d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 1) * 40, 40, WHITE);
                 }
-                EndDrawing();
-                break;
+            }
+            EndDrawing();
+            break;
 
-            case GAME: //Game screen
-                updateShipPositions(ships, selectedPlayers, GetFrameTime());
-                for (int i = 0; i < selectedPlayers; i++) {
-                    Vector2 mousePosWorld = GetScreenToWorld2D(GetMousePosition(), camera);
-                    ships[i].heading = atan2f(mousePosWorld.y - ships[i].position.y, mousePosWorld.x - ships[i].position.x);
-                }
-                for (int i = 0; i < selectedPlayers; i++) {
-                    //ships[i].isAlive = 1 - checkCollision(ships[i]);
-                }
+        case COUNTDOWN: // Countdown screen
+            countdownTimer -= GetFrameTime();
+            if (countdownTimer <= 0) {
+                currentScreen = GAME; // Transition to game screen
+            }
 
-                BeginDrawing();
-                ClearBackground(DARKBLUE);
+            BeginDrawing();
+            ClearBackground(BLACK);
+            DrawText(TextFormat("%.0f", countdownTimer > 0 ? ceil(countdownTimer) : 0), screenWidth / 2 - 50, screenHeight / 2 - 50, 100, WHITE);
+            EndDrawing();
+            break;
 
-                BeginMode2D(camera);
+        case GAME: //Game screen
+            updateShipPositions(ships, selectedPlayers, GetFrameTime());
+            for (int i = 0; i < selectedPlayers; i++) {
+                Vector2 mousePosWorld = GetScreenToWorld2D(GetMousePosition(), camera);
+                ships[i].heading = atan2f(mousePosWorld.y - ships[i].position.y, mousePosWorld.x - ships[i].position.x);
+            }
+            for (int i = 0; i < selectedPlayers; i++) {
+                //ships[i].isAlive = 1 - checkCollision(ships[i]);
+            }
 
-                DrawTexture(oceanTexture, 0, 0, WHITE);
+            BeginDrawing();
+            ClearBackground(DARKBLUE);
 
-                //drawObstacles();
-                Ship ship = ships[0];
-                // Draw the ship
-                if (ship.isAlive) {
-                    //checkCollision(ships[0]);
-                    DrawTexturePro(
+            BeginMode2D(camera);
+
+            DrawTexture(oceanTexture, 0, 0, WHITE);
+
+            //drawObstacles();
+            Ship ship = ships[0];
+            // Draw the ship
+            if (ship.isAlive) {
+                //checkCollision(ships[0]);
+                DrawTexturePro(
                     shipTexture,
                     (Rectangle){0, 0, shipTexture.width, shipTexture.height},
                     (Rectangle){ship.position.x, ship.position.y, 100, 100},
                     (Vector2){50, 50},
                     (ships[0].heading * RAD2DEG) + 270,
                     WHITE);
-                }
-                EndMode2D();
-                //DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GRAY);
-                if (checkCollision(ship, readSections, length/sizeof(struct CollisionSection))) {
-                   DrawText("COLLISION", 10, 10, 30, RED);
-                }
-                EndDrawing();
-                break;
+            }
+            EndMode2D();
+            //DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GRAY);
+            if (checkCollision(ship, readSections, length / sizeof(struct CollisionSection))) {
+                DrawText("COLLISION", 10, 10, 30, RED);
+            }
+            EndDrawing();
+            break;
         }
     }
     //Unload all textures
@@ -237,6 +254,7 @@ int main(void)
 
     // Unload audio resources
     UnloadMusicStream(backgroundMusic);
+    UnloadMusicStream(gameMusic);
     UnloadSound(selectionSound);
     UnloadSound(confirmSound);
     CloseAudioDevice();
