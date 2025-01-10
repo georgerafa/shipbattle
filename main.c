@@ -21,9 +21,12 @@ struct CollisionSection {
     int minimumDistance;
     struct Line Lines[10];
 };
+
 //Declare function prototypes
 int checkCollision(Ship ship, struct CollisionSection[], int sectionCount);
 int checkProjectileCollision(Ship ship, Projectile projectiles[]);
+int playersAlive(Ship ships[]);
+
 // Sound variables
 Music backgroundMusic;
 Music gameMusic;
@@ -33,12 +36,17 @@ Sound confirmSound;
 Texture2D shipTexture;
 Texture2D gameMapTexture;
 Texture2D backgroundTexture;
+Texture2D cannonBallTexture;
+
 GameScreen currentScreen = TITLE; //Initial screen state
 GameState currentState = DIRECTION_INSTR;
-int selectedPlayers = 2;
-int picking = 0;
+
 GameScreen previousScreen = TITLE;
 GameScreen nextScreen = PLAYER_SELECT;
+
+int selectedPlayers = 2;
+int picking = 0;
+
 float musicVolume = 0.4f;
 float soundVolume = 0.5f;
 
@@ -112,38 +120,58 @@ void main(void)
 
     // Initialize audio
     InitAudioDevice();
+
+    //Load main menu music
     backgroundMusic = LoadMusicStream("assets/background_music.mp3");
+    //Load in-game music
     gameMusic = LoadMusicStream("assets/game_music.mp3");
+    //Load selection sound effect
     selectionSound = LoadSound("assets/selection.wav");
+    //Load confirm selection sound effect
     confirmSound = LoadSound("assets/confirm.wav");
+
+    //Set volume
     SetMusicVolume(gameMusic,0.2f);
     SetSoundVolume(selectionSound, 0.5f);
     SetSoundVolume(confirmSound, 0.5f);
-    PlayMusicStream(backgroundMusic);
     SetMusicVolume(backgroundMusic, 0.4f);
 
-    Image gameMapImage = LoadImage("assets/gameMap.png"); //Load ocean background image
-    ImageResize(&gameMapImage, 2048, 2048);
-    gameMapTexture = LoadTextureFromImage(gameMapImage); //Create ocean texture
-    UnloadImage(gameMapImage);  //Unload the original image after creating the texture
+    //Start playing main menu music
+    PlayMusicStream(backgroundMusic);
 
-    Image backgroundImage = LoadImage("assets/background.png"); //Load main menu background image
-    backgroundTexture = LoadTextureFromImage(backgroundImage); //Create main menu background texture
-    UnloadImage(backgroundImage);  // Unload the original image after creating the texture
+    //Load images
+    Image gameMapImage = LoadImage("assets/gameMap.png");
+    Image backgroundImage = LoadImage("assets/background.png");
+    Image shipImage = LoadImage("assets/ship.png");
+    Image cannonBall = LoadImage("assets/cannonBall.png");
 
-    Image shipImage = LoadImage("assets/ship.png"); //Load ship image
-    shipTexture = LoadTextureFromImage(shipImage); //Create ship texture
-    UnloadImage(shipImage); //Unload original image after creating the texture
+    //Create textures
+    gameMapTexture = LoadTextureFromImage(gameMapImage);
+    backgroundTexture = LoadTextureFromImage(backgroundImage);
+    shipTexture = LoadTextureFromImage(shipImage);
+    cannonBallTexture = LoadTextureFromImage(cannonBall);
+
+    //Unload images
+    UnloadImage(gameMapImage);
+    UnloadImage(backgroundImage);
+    UnloadImage(shipImage);
+    UnloadImage(cannonBall);
+
 
     Camera2D camera = {0}; //Initialize 2D top down camera
     camera.zoom = (float)screenWidth/2048.0f; //Set camera zoom to 1
-    SetTargetFPS(GetMonitorRefreshRate(display)); //Set target fps to monitor refresh rate
+
+    //Set target fps to monitor refresh rate
+    SetTargetFPS(GetMonitorRefreshRate(display));
 
     Ship ships[MAX_PLAYERS]; //Create array for storing ships
-    Projectile projectiles[MAX_PLAYERS];
-    Vector2 posBuffer;
+    Projectile projectiles[MAX_PLAYERS]; //Create array for storing projectiles
 
+    Vector2 posBuffer; //Temporary position storage
+
+    //Counter variable for showing selected ship
     double selectAnimation = 0;
+    int targetPlayer = 0;
     while (!WindowShouldClose()) //While the window open
     {
         UpdateMusicStream(backgroundMusic);
@@ -152,11 +180,10 @@ void main(void)
         switch (currentScreen) //Change what is displayed based on current screen state
         {
         case TITLE: //Startup screen
-            if (IsKeyPressed(KEY_ENTER) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) //If enter is pressed or LMB is clicked move to player selection screen
-            {
+            if (IsKeyPressed(KEY_ENTER) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){ //If enter is pressed or LMB is clicked move to player selection screen
                 PlaySound(confirmSound); // Confirm sound
                 currentScreen = PLAYER_SELECT;
-            }else if (IsKeyPressed(KEY_ESCAPE)) { // Open settings menu
+            }else if (IsKeyPressed(KEY_ESCAPE)){ // Open settings menu
                 PlaySound(confirmSound);
                 previousScreen = TITLE;
                 currentScreen = SETTINGS;
@@ -172,6 +199,7 @@ void main(void)
                 (Vector2){0, 0},
                 0.0f,
                 WHITE);
+
             //Write some text on the screen
             DrawText("Welcome to Polunaumaxia!", 100, 100, 50, WHITE);
             DrawText("Press ENTER or click to start", 100, 200, 30, WHITE);
@@ -227,16 +255,17 @@ void main(void)
 
         case COUNTDOWN: // Countdown screen
             countdownTimer -= GetFrameTime()*1.1f;
-            if (countdownTimer <= 0) {
+            if (countdownTimer <= -1) {
                 currentScreen = GAME; // Transition to game screen
                 initializeShips(ships, selectedPlayers);
             }
 
             BeginDrawing();
             ClearBackground(BLACK);
-            DrawText(TextFormat("%.0f", countdownTimer > 0 ? ceil(countdownTimer) : 0), screenWidth / 2 - 50, screenHeight / 2 - 50, 100, WHITE);
             if (countdownTimer <= 0) {
-                DrawText("GO!", screenWidth / 2 - 50, screenHeight / 2 + 50, 100, GREEN);
+                DrawText("GO!", screenWidth / 2 - 50, screenHeight / 2+50 , 100, GREEN);
+            }else {
+                DrawText(TextFormat("%.0f", countdownTimer > 0 ? ceilf(countdownTimer) : 0), screenWidth / 2 - 50, screenHeight / 2+50 , 100, WHITE);
             }
             EndDrawing();
             break;
@@ -255,14 +284,15 @@ void main(void)
                 case DIRECTION_INSTR: {
                     selectAnimation = fmod(selectAnimation + GetFrameTime()*M_PI, M_PI*2);
                     Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), camera);
-                    ships[picking].heading = atan2(mousePos.y-ships[picking].position.y, mousePos.x-ships[picking].position.x);
+                    while (ships[picking].isAlive == 0) picking ++;
+                    ships[picking].heading = atan2f(mousePos.y-ships[picking].position.y, mousePos.x-ships[picking].position.x);
                     if (picking >= selectedPlayers) {
                         currentState = MOVEMENT_A;
                         picking = 0;
                     }
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         float mouseDist = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ships[picking].position));
-                        mouseDist = fmin(mouseDist, maxShipSpeed*2);
+                        mouseDist = (float)fmin(mouseDist, maxShipSpeed*2);
                         ships[picking].speed = mouseDist/2;
                         picking ++;
                     }
@@ -273,6 +303,7 @@ void main(void)
                     roundTimer -=GetFrameTime();
                     for (int i = 0; i < selectedPlayers; i++) {
                         ships[i].isAlive = (1 - checkCollision(ships[i], readSections, length/sizeof(struct CollisionSection)))*ships[i].isAlive;
+                        projectiles[i].position.z = ships[i].isAlive == 1 ? 10 : -10;
                     }
                     if (roundTimer <= 5) {
                         currentState = FIRE_INSTR;
@@ -284,21 +315,20 @@ void main(void)
                 case FIRE_INSTR: {
                     selectAnimation = fmod(selectAnimation + GetFrameTime()*M_PI, M_PI*2);
                     Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), camera);
-                    projectiles[picking].heading = atan2(mousePos.y-ships[picking].position.y, mousePos.x-ships[picking].position.x);
-                    DrawRectangle(20, screenHeight - 20, screenWidth-40, 20, (Color){255,255,255,128});
+                    projectiles[picking].heading = atan2f(mousePos.y-ships[picking].position.y, mousePos.x-ships[picking].position.x);
+                    DrawRectangleV(GetScreenToWorld2D((Vector2){20,screenHeight - 40}, camera), GetScreenToWorld2D((Vector2){screenWidth-40, 20}, camera), (Color){255,255,255,255});
                     if (picking >= selectedPlayers) {
                         currentState = MOVEMENT_B;
                         picking = 0;
                     }
+                    while (ships[picking].isAlive == 0) picking ++;
+                    projectiles[picking].angle = fmaxf(fminf(GetMouseWheelMove()*0.01f+projectiles[picking].angle, M_PI/2), 0);
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                        float mouseDist = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ships[picking].position)) ;
-                        mouseDist = fmax(fmin(mouseDist, maxShipSpeed*2+10), 10);
-                        projectiles[picking].angle = M_PI/2*(1-(mouseDist-10)/200);
                         projectiles[picking].position.x = ships[picking].position.x;
                         projectiles[picking].position.y = ships[picking].position.y;
                         projectiles[picking].position.z = 10;
                         ships[picking].position = posBuffer;
-                        picking ++;
+                        picking++;
                         if (picking<selectedPlayers) {
                             posBuffer = ships[picking].position;
                             ships[picking].position = Vector2Add(ships[picking].position, ships[picking].distanceMoved);
@@ -311,6 +341,7 @@ void main(void)
                     roundTimer -=GetFrameTime();
                     for (int i = 0; i < selectedPlayers; i++) {
                         ships[i].isAlive = (1 - checkCollision(ships[i], readSections, length/sizeof(struct CollisionSection)))*ships[i].isAlive;
+                        projectiles[i].position.z = ships[i].isAlive == 1 ? 10 : -10;
                     }
                     if (roundTimer <= 0) {
                         currentState = FIRE;
@@ -320,8 +351,25 @@ void main(void)
                 }
                 case FIRE: {
                     updateProjectiles(projectiles, ships, selectedPlayers, GetFrameTime());
+                    int projectilesAreAlive = 0;
                     for (int i = 0; i<selectedPlayers; i++) {
                         ships[i].isAlive = (1-checkProjectileCollision(ships[i], projectiles))*ships[i].isAlive;
+                        if (projectiles[i].position.z>0)  projectilesAreAlive = 1;
+                    }
+                    if (projectilesAreAlive==0) {
+                        if (playersAlive(ships) == 1) {
+                            //Win logic
+                        }
+                        else if (playersAlive(ships) == 0) {
+                            //Draw Logic
+                        }
+                        else {
+                            currentState = DIRECTION_INSTR;
+                            roundTimer = 10.0f;
+                            for (int i = 0 ; i<selectedPlayers; i++) {
+                                ships[i].distanceMoved = (Vector2){0};
+                            }
+                        }
                     }
                 }
 
@@ -332,7 +380,7 @@ void main(void)
                     Vector2 lineStart = ship.position;
                     if (i==picking && (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)) {
                         float mouseDist = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ship.position));
-                        mouseDist = (float)fmin(mouseDist, maxShipSpeed*2);
+                        mouseDist = currentState == FIRE_INSTR ? 200*(M_PI/2 - projectiles[i].angle)/(M_PI/2) : fminf(mouseDist, maxShipSpeed*2);
                         DrawRectanglePro((Rectangle){ship.position.x, ship.position.y, 10, mouseDist}, (Vector2){5,0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading) * RAD2DEG + 270, WHITE);
                         DrawTriangle(Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist, -10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist, 10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist+40, 0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), WHITE);
                     }
@@ -343,10 +391,11 @@ void main(void)
                         (Vector2){50, 50},
                         ship.heading * RAD2DEG + 270,
                         (Color){255, 255, 255, (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)&&i==picking?205-50*cos(selectAnimation) : 255});
-
-
                 }
-                if (currentState == FIRE&&projectiles[i].position.z>0&&ships[i].isAlive==1) DrawCircle(projectiles[i].position.x, projectiles[i].position.y, 5+0.05*projectiles[i].position.z, WHITE);
+
+            }
+            for (int i = 0 ; i<selectedPlayers; i++) {
+                if (currentState == FIRE&&projectiles[i].position.z>0) DrawTexturePro(cannonBallTexture, (Rectangle){0,0, cannonBallTexture.width, cannonBallTexture.height}, (Rectangle){projectiles[i].position.x, projectiles[i].position.y, 10+0.1f*projectiles[i].position.z, 10+0.1f*projectiles[i].position.z,},(Vector2){(10+0.1f*projectiles[i].position.z)/2, (10+0.1f*projectiles[i].position.z)/2}, 0, WHITE);
             }
 
 
@@ -371,6 +420,7 @@ void main(void)
     UnloadTexture(gameMapTexture);
     UnloadTexture(backgroundTexture);
     UnloadTexture(shipTexture);
+    UnloadTexture(cannonBallTexture);
 
     // Unload audio resources
     UnloadMusicStream(backgroundMusic);
@@ -383,8 +433,26 @@ void main(void)
     CloseWindow();
 }
 
+struct Line getTargetLine(Ship ships[], int shipA, int shipB) {
+    Ship shipOrigin = ships[shipA];
+    Ship shipTarget = ships[shipB];
+    Vector2 targetVector = Vector2Subtract(shipOrigin.position, shipTarget.position);
+    targetVector = Vector2Scale(targetVector, 2000/Vector2Length(Vector2Scale(targetVector, Vector2Length(targetVector))));
+    struct Line line;
+    //if (!CheckCollisionLines(targetVector, Vector2Negate(targetVector)))
+}
+
+int playersAlive(Ship ships[]) {
+    int playersAlive = 0;
+    for (int i = 0; i < selectedPlayers; i++) {
+        if (ships[i].isAlive == 1) playersAlive++;
+    }
+    return playersAlive;
+}
+
 int checkProjectileCollision(Ship ship, Projectile projectiles[]) {
     Vector2 shipPos = ship.position;//Position of the provided ship
+    if (ship.isAlive==0) return 0;
     struct Line shipLines[4] = { //The line segments that make up the hitbox of the ship
         {
             {(-40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x),(-40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)},
@@ -406,7 +474,7 @@ int checkProjectileCollision(Ship ship, Projectile projectiles[]) {
     for (int i = 0; i < selectedPlayers; i++) {
         Projectile projectile = projectiles[i];
         for (int j = 0; j < 4; j++) {
-            if (CheckCollisionCircleLine((Vector2){projectile.position.x, projectile.position.y}, 15, shipLines[i].start, shipLines[i].end)&&projectile.position.z<15&&projectile.team!=ship.team) {
+            if (CheckCollisionCircleLine((Vector2){projectile.position.x, projectile.position.y}, 15, shipLines[i].start, shipLines[i].end)&&projectile.position.z<15&&projectile.position.z>0&&projectile.team!=ship.team) {
                 return 1;
             }
         }

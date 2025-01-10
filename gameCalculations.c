@@ -58,6 +58,7 @@ void initializeProjectiles(Projectile *projectiles, int projectileCount) { //Ini
         projectiles[i].speed.x = cosf(projectiles[i].heading)*cosf(projectiles[i].angle)*PROJECTILE_SPEED;
         projectiles[i].speed.y = sinf(projectiles[i].heading)*cosf(projectiles[i].angle)*PROJECTILE_SPEED;
         projectiles[i].speed.z = sinf(projectiles[i].angle)*PROJECTILE_SPEED;
+        projectiles[i].team = i;
     }
 }
 
@@ -65,7 +66,7 @@ void initializeProjectiles(Projectile *projectiles, int projectileCount) { //Ini
 void updateProjectiles(Projectile *projectiles, Ship *ships, int projectileCount, float deltaT) {
     for (int i = 0; i < projectileCount; i++) {
         Projectile projectile = projectiles[i];
-        if (projectiles[i].position.z > 0 && ships[i].isAlive==1) {
+        if (projectiles[i].position.z > 0) {
             projectiles[i].position = (Vector3){projectile.position.x+projectile.speed.x*deltaT, projectile.position.y+projectile.speed.y*deltaT, projectile.position.z+projectile.speed.z*deltaT};
             projectiles[i].speed.z -= GRAVITY*deltaT;
         }
