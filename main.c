@@ -50,6 +50,10 @@ int picking = 0;
 float musicVolume = 0.4f;
 float soundVolume = 0.5f;
 
+int screenWidth;
+int screenHeight;
+Camera2D camera;
+
 void main(void)
 {
     FILE *f = fopen("collisions.dat", "rb");
@@ -72,8 +76,8 @@ void main(void)
     InitWindow(800, 800, "POLYNAYMAXIA"); //Initialize the game window
     SetExitKey(0);
     const int display = GetCurrentMonitor(); //Get which display the game is running on
-    const int screenWidth = GetMonitorWidth(display); //Get screen width
-    const int screenHeight = GetMonitorHeight(display); //Get screen height
+    screenWidth = GetMonitorWidth(display); //Get screen width
+    screenHeight = GetMonitorHeight(display); //Get screen height
     SetWindowSize(screenWidth, screenHeight); //Set the game window size to be the same as the screen size
     ToggleFullscreen(); //Set window mode to fullscreen
 
@@ -117,7 +121,7 @@ void main(void)
     UnloadImage(cannonBall);
 
 
-    Camera2D camera = {0}; //Initialize 2D top down camera
+    camera = {0}; //Initialize 2D top down camera
     camera.zoom = (float)screenWidth/2048.0f; //Set camera zoom to 1
 
     //Set target fps to monitor refresh rate
@@ -365,12 +369,14 @@ void main(void)
             for (int i = 0; i < selectedPlayers; i++) {
                 Ship ship = ships[i];
                 if (ship.isAlive) {
+
                     Vector2 lineStart = ship.position;
                     if (i==picking && (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)) {
                         float mouseDist = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ship.position));
                         mouseDist = currentState == FIRE_INSTR ? 200*(M_PI/2 - projectiles[i].angle)/(M_PI/2) : fminf(mouseDist, maxShipSpeed*2);
                         DrawRectanglePro((Rectangle){ship.position.x, ship.position.y, 10, mouseDist}, (Vector2){5,0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading) * RAD2DEG + 270, WHITE);
                         DrawTriangle(Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist, -10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist, 10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist+40, 0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), WHITE);
+
                     }
                     DrawTexturePro(
                         shipTexture,
@@ -486,7 +492,13 @@ struct Line getTargetLine(Ship ships[], int shipA, int shipB) {
     Vector2 targetVector = Vector2Subtract(shipOrigin.position, shipTarget.position);
     targetVector = Vector2Scale(targetVector, 2000/Vector2Length(Vector2Scale(targetVector, Vector2Length(targetVector))));
     struct Line line;
-    //if (!CheckCollisionLines(targetVector, Vector2Negate(targetVector)))
+    if (!CheckCollisionLines(targetVector, Vector2Negate(targetVector), (Vector2){0,0}, GetScreenToWorld2D({screenWidth, 0}, camera), &line.start)) {
+        CheckCollisionLines(targetVector, Vector2Negate(targetVector), GetScreenToWorld2D((Vector2){screenWidth,0}, camera), GetScreenToWorld2D({screenWidth, screenWidth}, camera), &line.start);
+    }
+    if (!CheckCollisionLines(targetVector, Vector2Negate(targetVector), GetScreenToWorld2D((Vector2){0,screenHeight}, camera), GetScreenToWorld2D({screenWidth, screenHeight}, camera), &line.end)) {
+        CheckCollisionLines(targetVector, Vector2Negate(targetVector), GetScreenToWorld2D((Vector2){0,0}, camera), GetScreenToWorld2D({0, screenHeight}, camera), &line.end);
+    }
+    return line;
 }
 
 int playersAlive(Ship ships[]) {
