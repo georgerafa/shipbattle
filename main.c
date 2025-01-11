@@ -131,7 +131,8 @@ void main(void)
     //Counter variable for showing selected ship
     double selectAnimation = 0;
     int targetPlayer = 0;
-    while (!WindowShouldClose()) //While the window open
+    bool shouldExit = 0;
+    while (!(WindowShouldClose()||shouldExit)) //While the window open
     {
         UpdateMusicStream(backgroundMusic);
         UpdateMusicStream(gameMusic);
@@ -139,13 +140,36 @@ void main(void)
         switch (currentScreen) //Change what is displayed based on current screen state
         {
         case TITLE: //Startup screen
+            static int selectedOption = 0;
+            if (IsKeyPressed(KEY_UP)) {
+                PlaySound(selectionSound);
+                selectedOption = (selectedOption - 1 + 4) % 4;
+            }
+            if (IsKeyPressed(KEY_DOWN)) {
+                PlaySound(selectionSound);
+                selectedOption = (selectedOption + 5) % 4;
+            }
             if (IsKeyPressed(KEY_ENTER) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){ //If enter is pressed or LMB is clicked move to player selection screen
-                PlaySound(confirmSound); // Confirm sound
-                currentScreen = PLAYER_SELECT;
+
             }else if (IsKeyPressed(KEY_ESCAPE)){ // Open settings menu
                 PlaySound(confirmSound);
                 previousScreen = TITLE;
                 currentScreen = SETTINGS;
+            }
+
+            if (selectedOption == 0 && (IsKeyPressed(KEY_ENTER))) {
+                PlaySound(confirmSound); // Confirm sound
+                currentScreen = PLAYER_SELECT;
+            }else if (selectedOption == 1 && (IsKeyPressed(KEY_ENTER)))
+            {
+                PlaySound(confirmSound);
+            } else if (selectedOption == 2 && (IsKeyPressed(KEY_ENTER)))
+            {
+                PlaySound(confirmSound);
+                currentScreen = SETTINGS;
+            } else if (selectedOption == 3 && (IsKeyPressed(KEY_ENTER)))
+            {
+                shouldExit = 1;
             }
 
             BeginDrawing(); //Start rendering the screen
@@ -160,9 +184,16 @@ void main(void)
                 WHITE);
 
             //Write some text on the screen
-            DrawText("Welcome to Mononaumaxia!", 100, 100, 50, WHITE);
-            DrawText("Press ENTER or click to start", 100, 200, 30, WHITE);
-            DrawText("Press ESC for options", 100, 250, 30, WHITE);
+            DrawText("Welcome to Mononaumaxia!", 100, 150, 50, WHITE);
+            DrawText(TextFormat("New Game"), 100, 250, 30,
+         selectedOption == 0 ? WHITE : BLACK);
+            DrawText(TextFormat("Resume game"), 100, 300, 30,
+                     selectedOption == 1 ? WHITE : BLACK);
+            DrawText("Options", 100, 350, 30,
+                     selectedOption == 2 ? WHITE : BLACK);
+            DrawText("Exit", 100, 400, 30,
+         selectedOption == 3 ? WHITE : BLACK);
+
 
             EndDrawing();//Stop drawing screen
             break;
