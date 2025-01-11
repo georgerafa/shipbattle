@@ -166,7 +166,9 @@ void main(void)
             } else if (selectedOption == 2 && (IsKeyPressed(KEY_ENTER)))
             {
                 PlaySound(confirmSound);
+                previousScreen = TITLE;
                 currentScreen = SETTINGS;
+
             } else if (selectedOption == 3 && (IsKeyPressed(KEY_ENTER)))
             {
                 shouldExit = 1;
@@ -197,28 +199,29 @@ void main(void)
 
             EndDrawing();//Stop drawing screen
             break;
-        case PLAYER_SELECT: //Player selection screen
-            if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) { //Navigate through options
-                PlaySound(selectionSound); // Play navigation sound
-                if (IsKeyPressed(KEY_UP) && selectedPlayers > 2 ) {
+
+        case PLAYER_SELECT: // Player selection screen
+                const int totalOptions = MAX_PLAYERS + 1;
+            if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) {
+                PlaySound(selectionSound);
+                if (IsKeyPressed(KEY_UP) && selectedPlayers > 2) {
                     selectedPlayers--;
-                } else if (IsKeyPressed(KEY_DOWN) && selectedPlayers < MAX_PLAYERS) {
+                } else if (IsKeyPressed(KEY_DOWN) && selectedPlayers < totalOptions) {
                     selectedPlayers++;
                 }
             }
 
-            if (IsKeyPressed(KEY_ENTER)) { //If enter is pressed, transition to countdown
-                PlaySound(confirmSound); // Confirm sound
-                currentScreen = COUNTDOWN;
-                PlayMusicStream(gameMusic); // Start game music
-                StopMusicStream(backgroundMusic); // Stop menu music
+            if (IsKeyPressed(KEY_ENTER)) {
+                PlaySound(confirmSound);
+                if (selectedPlayers <= MAX_PLAYERS) {
+                    currentScreen = COUNTDOWN;
+                    PlayMusicStream(gameMusic);
+                    StopMusicStream(backgroundMusic);
+                } else if (selectedPlayers == totalOptions) {
+                    currentScreen = TITLE;
+                }
             }
 
-            if (IsKeyPressed(KEY_ESCAPE)) { // Open settings menu
-                PlaySound(confirmSound);
-                previousScreen = PLAYER_SELECT;
-                currentScreen = SETTINGS;
-            }
             BeginDrawing();
             ClearBackground(RAYWHITE);
 
@@ -228,20 +231,27 @@ void main(void)
                 (Rectangle){0, 0, (float)screenWidth, (float)screenHeight},
                 (Vector2){0, 0}, 0.0f,
                 WHITE);
-            //Draw navigation instructions on screen
+
             DrawText("Select Number of Players (2 to 6)", 100, 100, 40, WHITE);
             DrawText("Press UP/DOWN arrows to choose", 100, 160, 30, WHITE);
-            DrawText("Press ENTER to start", 100, 200, 30, WHITE);
-            //Draw possible options
+            DrawText("Press ENTER to select", 100, 200, 30, WHITE);
+
             for (int i = 2; i <= MAX_PLAYERS; i++) {
                 if (i == selectedPlayers) {
-                    DrawText(TextFormat("> %d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 1) * 40, 40, GREEN);
+                    DrawText(TextFormat("> %d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 2) * 40, 40, GREEN);
                 } else {
-                    DrawText(TextFormat("%d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 1) * 40, 40, WHITE);
+                    DrawText(TextFormat("%d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 2) * 40, 40, WHITE);
                 }
             }
+            if (selectedPlayers == totalOptions) {
+                DrawText("> Return to Main Menu", 100, 300 + (MAX_PLAYERS - 1) * 40, 40, GREEN);
+            } else {
+                DrawText("Return to Main Menu", 100, 300 + (MAX_PLAYERS - 1) * 40, 40, WHITE);
+            }
+
             EndDrawing();
             break;
+
 
         case COUNTDOWN: // Countdown screen
             countdownTimer -= GetFrameTime()*1.1f;
@@ -394,31 +404,44 @@ void main(void)
                     static int selectedOption = 0;
                     if (IsKeyPressed(KEY_UP)) {
                         PlaySound(selectionSound);
-                        selectedOption = (selectedOption - 1 + 3) % 3;
+                        selectedOption = (selectedOption - 1 + 6) % 6;
                     }
                     if (IsKeyPressed(KEY_DOWN)) {
                         PlaySound(selectionSound);
-                        selectedOption = (selectedOption + 1) % 3;
+                        selectedOption = (selectedOption + 1) % 6;
                     }
-                    if (selectedOption == 0 && (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT))) { // Music Volume
+                    if (selectedOption == 0 && IsKeyPressed(KEY_ENTER))
+                    {
+                        PlaySound(confirmSound);
+                        currentScreen= previousScreen;
+                    }
+                    if (selectedOption == 1 && (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT))) { // Music Volume
                         PlaySound(selectionSound);
                         musicVolume = IsKeyPressed(KEY_RIGHT)
                                         ? fminf(musicVolume + 0.1f, 1.0f)
                                         : fmaxf(musicVolume - 0.1f, 0.0f);
                         SetMusicVolume(backgroundMusic, musicVolume);
                         SetMusicVolume(gameMusic, musicVolume);
-                    } else if (selectedOption == 1 && (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT))) { // Sound Volume
+                    } else if (selectedOption == 2 && (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT))) { // Sound Volume
                         PlaySound(selectionSound);
                         soundVolume = IsKeyPressed(KEY_RIGHT)
                                         ? fminf(soundVolume + 0.1f, 1.0f)
                                         : fmaxf(soundVolume - 0.1f, 0.0f);
                         SetSoundVolume(selectionSound, soundVolume);
                         SetSoundVolume(confirmSound, soundVolume);
-                    }
-
-                    if (selectedOption == 2 && IsKeyPressed(KEY_ENTER)) {
+                    } else if (selectedOption == 3 && IsKeyPressed(KEY_ENTER)) {
                         PlaySound(confirmSound);
                         currentScreen = HOW_TO_PLAY;
+                    } else if (selectedOption == 4 && IsKeyPressed(KEY_ENTER))
+                    {
+                        PlaySound(selectionSound);
+                        currentScreen = TITLE;
+                        StopMusicStream(gameMusic); // Start game music
+                        PlayMusicStream(backgroundMusic); // Stop menu music
+
+                    } else if (selectedOption == 5 && IsKeyPressed(KEY_ENTER))
+                    {
+                        shouldExit = 1;
                     }
 
                     if (IsKeyPressed(KEY_ESCAPE)) {
@@ -430,17 +453,20 @@ void main(void)
                     ClearBackground((Color){255, 255, 255, 100});
 
                     DrawText("SETTINGS MENU", 100, 100, 50, BLACK);
-
-
-                    DrawText(TextFormat("Music Volume: %.1f", musicVolume), 100, 200, 30,
+                    DrawText(TextFormat("Return"), 100, 200, 30,
                              selectedOption == 0 ? RED : BLACK);
-                    DrawText(TextFormat("Sound Volume: %.1f", soundVolume), 100, 250, 30,
+                    DrawText(TextFormat("Music Volume: %.1f", musicVolume), 100, 250, 30,
                              selectedOption == 1 ? RED : BLACK);
-                    DrawText("How to Play Instructions", 100, 300, 30,
+                    DrawText(TextFormat("Sound Volume: %.1f", soundVolume), 100, 300, 30,
                              selectedOption == 2 ? RED : BLACK);
-
-                    DrawText("Use UP/DOWN to navigate, LEFT/RIGHT to adjust", 100, 400, 20, BLACK);
-                    DrawText("Press ENTER to select, ESC to return", 100, 450, 20, BLACK);
+                    DrawText("How to Play Instructions", 100, 350, 30,
+                             selectedOption == 3 ? RED : BLACK);
+                    DrawText(TextFormat("Go To Main Menu"), 100, 400, 30,
+                        selectedOption == 4 ? RED : BLACK);
+                    DrawText(TextFormat("Exit to desktop"), 100, 450, 30,
+                        selectedOption == 5 ? RED : BLACK);
+                    DrawText("Use UP/DOWN to navigate, LEFT/RIGHT to adjust", 100, 550, 20, BLACK);
+                    DrawText("Press ENTER to select, ESC to return", 100, 600, 20, BLACK);
 
                     EndDrawing();
                     break;
