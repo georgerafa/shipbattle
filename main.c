@@ -222,6 +222,12 @@ void main(void)
                 }
             }
 
+            if (IsKeyPressed(KEY_ESCAPE)){
+                PlaySound(confirmSound);
+                previousScreen = PLAYER_SELECT;
+                currentScreen =SETTINGS;
+            }
+
             BeginDrawing();
             ClearBackground(RAYWHITE);
 
