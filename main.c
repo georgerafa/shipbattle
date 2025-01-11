@@ -10,7 +10,7 @@
 float countdownTimer = 3.0f; // Countdown timer for 3-2-1-Go
 float roundTimer = 10.0f;
 typedef enum GameState {DIRECTION_INSTR, MOVEMENT_A, FIRE_INSTR, MOVEMENT_B, FIRE} GameState;
-typedef enum GameScreen {TITLE, PLAYER_SELECT, COUNTDOWN, GAME, SETTINGS } GameScreen; //All screen states
+typedef enum GameScreen {TITLE, PLAYER_SELECT, COUNTDOWN, GAME, SETTINGS, HOW_TO_PLAY} GameScreen; //All screen states
 
 struct Line {
     Vector2 start;
@@ -49,47 +49,6 @@ int picking = 0;
 
 float musicVolume = 0.4f;
 float soundVolume = 0.5f;
-
-void updateSettingsMenu() {
-    if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) {
-        PlaySound(selectionSound); // Play navigation sound
-        if (IsKeyPressed(KEY_UP)) {
-            musicVolume = fminf(musicVolume + 0.1f, 1.0f); // Increase music volume
-        } else if (IsKeyPressed(KEY_DOWN)) {
-            musicVolume = fmaxf(musicVolume - 0.1f, 0.0f); // Decrease music volume
-        }
-        SetMusicVolume(backgroundMusic, musicVolume);
-        SetMusicVolume(gameMusic, musicVolume);
-    }
-
-    if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT)) {
-        PlaySound(selectionSound); // Play navigation sound
-        if (IsKeyPressed(KEY_LEFT)) {
-            soundVolume = fmaxf(soundVolume - 0.1f, 0.0f); // Decrease sound volume
-        } else if (IsKeyPressed(KEY_RIGHT)) {
-            soundVolume = fminf(soundVolume + 0.1f, 1.0f); // Increase sound volume
-        }
-        SetSoundVolume(selectionSound, soundVolume);
-        SetSoundVolume(confirmSound, soundVolume);
-    }
-
-    if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_ENTER)) {
-        PlaySound(confirmSound); // Confirm sound
-        currentScreen = GAME; // Return to the game
-    }
-}
-
-void drawSettingsMenu(int screenWidth, int screenHeight) {
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
-
-    DrawText("SETTINGS MENU", 100, 100, 50, BLACK);
-    DrawText(TextFormat("Music Volume: %.1f (UP/DOWN)", musicVolume), 100, 200, 30, BLACK);
-    DrawText(TextFormat("Sound Volume: %.1f (LEFT/RIGHT)", soundVolume), 100, 250, 30, BLACK);
-    DrawText("Press ESC or ENTER to return to the game", 100, 350, 30, BLACK);
-
-    EndDrawing();
-}
 
 void main(void)
 {
@@ -201,7 +160,7 @@ void main(void)
                 WHITE);
 
             //Write some text on the screen
-            DrawText("Welcome to Polunaumaxia!", 100, 100, 50, WHITE);
+            DrawText("Welcome to Mononaumaxia!", 100, 100, 50, WHITE);
             DrawText("Press ENTER or click to start", 100, 200, 30, WHITE);
             DrawText("Press ESC for options", 100, 250, 30, WHITE);
 
@@ -269,11 +228,11 @@ void main(void)
             }
             EndDrawing();
             break;
-        case GAME: //Game screen
+        case GAME:
             if (IsKeyPressed(KEY_ESCAPE)) {
                 PlaySound(confirmSound);
                 previousScreen = GAME;
-                currentScreen = SETTINGS; // Transition to settings menu
+                currentScreen = SETTINGS;
             }
             BeginDrawing();
             ClearBackground(DARKBLUE);
@@ -358,10 +317,8 @@ void main(void)
                     }
                     if (projectilesAreAlive==0) {
                         if (playersAlive(ships) == 1) {
-                            //Win logic
                         }
                         else if (playersAlive(ships) == 0) {
-                            //Draw Logic
                         }
                         else {
                             currentState = DIRECTION_INSTR;
@@ -398,22 +355,81 @@ void main(void)
                 if (currentState == FIRE&&projectiles[i].position.z>0) DrawTexturePro(cannonBallTexture, (Rectangle){0,0, cannonBallTexture.width, cannonBallTexture.height}, (Rectangle){projectiles[i].position.x, projectiles[i].position.y, 10+0.1f*projectiles[i].position.z, 10+0.1f*projectiles[i].position.z,},(Vector2){(10+0.1f*projectiles[i].position.z)/2, (10+0.1f*projectiles[i].position.z)/2}, 0, WHITE);
             }
 
-
-
             EndMode2D();
             EndDrawing();
             break;
 
-            case SETTINGS:
-                updateSettingsMenu();
-            if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_ENTER)) {
-                PlaySound(confirmSound);
-                currentScreen = previousScreen; // Return to the previous screen
-            }
-            drawSettingsMenu(screenWidth, screenHeight);
-            break;
+            case SETTINGS: {
+                    static int selectedOption = 0;
+                    if (IsKeyPressed(KEY_UP)) {
+                        PlaySound(selectionSound);
+                        selectedOption = (selectedOption - 1 + 3) % 3;
+                    }
+                    if (IsKeyPressed(KEY_DOWN)) {
+                        PlaySound(selectionSound);
+                        selectedOption = (selectedOption + 1) % 3;
+                    }
+                    if (selectedOption == 0 && (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT))) { // Music Volume
+                        PlaySound(selectionSound);
+                        musicVolume = IsKeyPressed(KEY_RIGHT)
+                                        ? fminf(musicVolume + 0.1f, 1.0f)
+                                        : fmaxf(musicVolume - 0.1f, 0.0f);
+                        SetMusicVolume(backgroundMusic, musicVolume);
+                        SetMusicVolume(gameMusic, musicVolume);
+                    } else if (selectedOption == 1 && (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT))) { // Sound Volume
+                        PlaySound(selectionSound);
+                        soundVolume = IsKeyPressed(KEY_RIGHT)
+                                        ? fminf(soundVolume + 0.1f, 1.0f)
+                                        : fmaxf(soundVolume - 0.1f, 0.0f);
+                        SetSoundVolume(selectionSound, soundVolume);
+                        SetSoundVolume(confirmSound, soundVolume);
+                    }
+
+                    if (selectedOption == 2 && IsKeyPressed(KEY_ENTER)) {
+                        PlaySound(confirmSound);
+                        currentScreen = HOW_TO_PLAY;
+                    }
+
+                    if (IsKeyPressed(KEY_ESCAPE)) {
+                        PlaySound(confirmSound);
+                        currentScreen = previousScreen;
+                    }
+
+                    BeginDrawing();
+                    ClearBackground((Color){255, 255, 255, 100});
+
+                    DrawText("SETTINGS MENU", 100, 100, 50, BLACK);
 
 
+                    DrawText(TextFormat("Music Volume: %.1f", musicVolume), 100, 200, 30,
+                             selectedOption == 0 ? RED : BLACK);
+                    DrawText(TextFormat("Sound Volume: %.1f", soundVolume), 100, 250, 30,
+                             selectedOption == 1 ? RED : BLACK);
+                    DrawText("How to Play Instructions", 100, 300, 30,
+                             selectedOption == 2 ? RED : BLACK);
+
+                    DrawText("Use UP/DOWN to navigate, LEFT/RIGHT to adjust", 100, 400, 20, BLACK);
+                    DrawText("Press ENTER to select, ESC to return", 100, 450, 20, BLACK);
+
+                    EndDrawing();
+                    break;
+                }
+
+
+             case HOW_TO_PLAY: {
+                    BeginDrawing();
+                    ClearBackground((Color){255, 255, 255, 100});
+                    DrawText("HOW TO PLAY", 100, 100, 50, BLACK);
+                    DrawText("Press ESC to return to the Settings Menu", 100, 450, 20, BLACK);
+
+                    EndDrawing();
+
+                    if (IsKeyPressed(KEY_ESCAPE)) {
+                        PlaySound(confirmSound);
+                        currentScreen = previousScreen;
+                    }
+                    break;
+                }
         }
     }
     //Unload all textures
