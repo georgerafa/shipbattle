@@ -437,13 +437,12 @@ void main(void)
                 }
 
 
-                DrawText("Press Enter to return to the main menu.", screenWidth / 2 - MeasureText("Press Enter to return to the main menu.", 20) / 2, 400, 20, WHITE);
+                DrawText("Press Enter to return to the main menu.", screenWidth / 2 - MeasureText("Press Enter to return to the main menu.", 30) / 2, 50, 30, WHITE);
 
                 if (IsKeyPressed(KEY_ENTER)) {
                     currentScreen =TITLE;
                     currentState = DIRECTION_INSTR;
                     roundTimer = 10.0f;
-
 
                     for (int i = 0; i < selectedPlayers; i++) {
                         ships[i].isAlive = 1;
@@ -451,6 +450,11 @@ void main(void)
                         ships[i].distanceMoved = (Vector2){0};
                         projectiles[i].position = (Vector3){-10, -10, -10};
                     }
+                }
+
+                if (IsKeyPressed(KEY_ESCAPE))
+                {
+                    shouldExit = 1;
                 }
 
                 EndDrawing();
