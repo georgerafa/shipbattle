@@ -10,7 +10,7 @@
 float countdownTimer = 3.0f; // Countdown timer for 3-2-1-Go
 float roundTimer = 10.0f;
 typedef enum GameState {DIRECTION_INSTR, MOVEMENT_A, FIRE_INSTR, MOVEMENT_B, FIRE} GameState;
-typedef enum GameScreen {TITLE, PLAYER_SELECT, COUNTDOWN, GAME, SETTINGS, HOW_TO_PLAY} GameScreen; //All screen states
+typedef enum GameScreen {TITLE, PLAYER_SELECT, COUNTDOWN, GAME, SETTINGS, HOW_TO_PLAY, END} GameScreen; //All screen states
 
 struct Line {
     Vector2 start;
@@ -37,6 +37,7 @@ Texture2D shipTexture;
 Texture2D gameMapTexture;
 Texture2D backgroundTexture;
 Texture2D cannonBallTexture;
+Texture2D endTexture;
 
 GameScreen currentScreen = TITLE; //Initial screen state
 GameState currentState = DIRECTION_INSTR;
@@ -103,18 +104,21 @@ void main(void)
     Image backgroundImage = LoadImage("assets/background.png");
     Image shipImage = LoadImage("assets/ship.png");
     Image cannonBall = LoadImage("assets/cannonBall.png");
+    Image endImage = LoadImage("assets/end.png");
 
     //Create textures
     gameMapTexture = LoadTextureFromImage(gameMapImage);
     backgroundTexture = LoadTextureFromImage(backgroundImage);
     shipTexture = LoadTextureFromImage(shipImage);
     cannonBallTexture = LoadTextureFromImage(cannonBall);
+    Texture endTexture = LoadTextureFromImage(endImage);
 
     //Unload images
     UnloadImage(gameMapImage);
     UnloadImage(backgroundImage);
     UnloadImage(shipImage);
     UnloadImage(cannonBall);
+    UnloadImage(endImage);
 
 
     Camera2D camera = {0}; //Initialize 2D top down camera
@@ -269,9 +273,9 @@ void main(void)
             BeginDrawing();
             ClearBackground(BLACK);
             if (countdownTimer <= 0) {
-                DrawText("GO!", screenWidth / 2 - 50, screenHeight / 2+50 , 100, GREEN);
+                DrawText("GO!", screenWidth / 2 - 50, screenHeight /2 -25 , 100, GREEN);
             }else {
-                DrawText(TextFormat("%.0f", countdownTimer > 0 ? ceilf(countdownTimer) : 0), screenWidth / 2 - 50, screenHeight / 2+50 , 100, WHITE);
+                DrawText(TextFormat("%.0f", countdownTimer > 0 ? ceilf(countdownTimer) : 0), screenWidth / 2 - 50, screenHeight / 2 -25 , 100, WHITE);
             }
             EndDrawing();
             break;
@@ -311,6 +315,11 @@ void main(void)
                         ships[i].isAlive = (1 - checkCollision(ships[i], readSections, length/sizeof(struct CollisionSection)))*ships[i].isAlive;
                         projectiles[i].position.z = ships[i].isAlive == 1 ? 10 : -10;
                     }
+
+                    if (playersAlive(ships) <= 1) {
+                            currentScreen = END;
+                    }
+
                     if (roundTimer <= 5) {
                         currentState = FIRE_INSTR;
                         posBuffer = ships[0].position;
@@ -363,9 +372,8 @@ void main(void)
                         if (projectiles[i].position.z>0)  projectilesAreAlive = 1;
                     }
                     if (projectilesAreAlive==0) {
-                        if (playersAlive(ships) == 1) {
-                        }
-                        else if (playersAlive(ships) == 0) {
+                        if (playersAlive(ships) <= 1) {
+                            currentScreen = END;
                         }
                         else {
                             currentState = DIRECTION_INSTR;
@@ -405,6 +413,49 @@ void main(void)
             EndMode2D();
             EndDrawing();
             break;
+
+        case END: {
+                BeginDrawing();
+                ClearBackground(RAYWHITE);
+
+                DrawTexturePro( //Draw the background texture
+                    endTexture,
+                    (Rectangle){0, 0, (float)endTexture.width, (float)endTexture.height},
+                    (Rectangle){0, 0, (float)screenWidth, (float)screenHeight},
+                    (Vector2){0, 0},
+                    0.0f,
+                    WHITE);
+
+
+                if (playersAlive(ships) == 1)
+                {
+                    DrawText("Victory!", screenWidth / 2 - MeasureText("Victory!", 100) / 2, 150, 100, BLACK);
+
+                } else if (playersAlive(ships) == 0)
+                {
+                    DrawText("Draw", screenWidth / 2 - MeasureText("Draw", 100) / 2, 150, 100, BLACK);
+                }
+
+
+                DrawText("Press Enter to return to the main menu.", screenWidth / 2 - MeasureText("Press Enter to return to the main menu.", 20) / 2, 400, 20, WHITE);
+
+                if (IsKeyPressed(KEY_ENTER)) {
+                    currentScreen =TITLE;
+                    currentState = DIRECTION_INSTR;
+                    roundTimer = 10.0f;
+
+
+                    for (int i = 0; i < selectedPlayers; i++) {
+                        ships[i].isAlive = 1;
+                        ships[i].position = (Vector2){0, 0};
+                        ships[i].distanceMoved = (Vector2){0};
+                        projectiles[i].position = (Vector3){-10, -10, -10};
+                    }
+                }
+
+                EndDrawing();
+                break;
+        }
 
             case SETTINGS: {
                     static int selectedOption = 0;
