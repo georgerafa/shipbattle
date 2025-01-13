@@ -321,11 +321,14 @@ void main(void)
                         projectiles[i].position.z = ships[i].isAlive == 1 ? 10 : -10;
                     }
 
-                    if (playersAlive(ships) <= 1) {
-                            currentScreen = END;
-                    }
-
                     if (roundTimer <= 5) {
+                        if (playersAlive(ships) <= 1) {
+                            currentScreen = END;
+                            StopMusicStream(gameMusic); // Start game music
+                            PlayMusicStream(backgroundMusic); // Stop menu music
+
+                        }
+
                         currentState = FIRE_INSTR;
                         ships[0].position = Vector2Add(ships[0].position, ships[0].distanceMoved);
                     }
@@ -384,6 +387,9 @@ void main(void)
                     if (projectilesAreAlive==0) {
                         if (playersAlive(ships) <= 1) {
                             currentScreen = END;
+                            StopMusicStream(gameMusic); // Start game music
+                            PlayMusicStream(backgroundMusic); // Stop menu music
+
                         }
                         else {
                             currentState = DIRECTION_INSTR;
