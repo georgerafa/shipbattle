@@ -227,6 +227,7 @@ void main(void)
                 PlaySound(confirmSound);
                 if (selectedPlayers <= MAX_PLAYERS) {
                     currentScreen = COUNTDOWN;
+                    countdownTimer = 3;
                     PlayMusicStream(gameMusic);
                     StopMusicStream(backgroundMusic);
                 } else if (selectedPlayers == totalOptions) {
@@ -485,6 +486,7 @@ void main(void)
                         ships[i].distanceMoved = (Vector2){0};
                         projectiles[i].position = (Vector3){-10, -10, -10};
                     }
+
                 }
 
                 if (IsKeyPressed(KEY_ESCAPE))
