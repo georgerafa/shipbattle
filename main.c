@@ -320,6 +320,12 @@ void main(void)
                         ships[i].isAlive = (1 - checkCollision(ships[i], readSections, length/sizeof(struct CollisionSection)))*ships[i].isAlive;
                         projectiles[i].position.z = ships[i].isAlive == 1 ? 10 : -10;
                     }
+                        if (playersAlive(ships) == 0) {
+                            currentScreen = END;
+                            StopMusicStream(gameMusic); // Start game music
+                            PlayMusicStream(backgroundMusic); // Stop menu music
+
+                        }
 
                     if (roundTimer <= 5) {
                         if (playersAlive(ships) <= 1) {
@@ -370,7 +376,21 @@ void main(void)
                         ships[i].isAlive = (1 - checkCollision(ships[i], readSections, length/sizeof(struct CollisionSection)))*ships[i].isAlive;
                         projectiles[i].position.z = ships[i].isAlive == 1 ? 10 : -10;
                     }
+
+                        if (playersAlive(ships) == 0) {
+                            currentScreen = END;
+                            StopMusicStream(gameMusic); // Start game music
+                            PlayMusicStream(backgroundMusic); // Stop menu music
+
+                        }
+
                     if (roundTimer <= 0) {
+                        if (playersAlive(ships) <= 1) {
+                            currentScreen = END;
+                            StopMusicStream(gameMusic); // Start game music
+                            PlayMusicStream(backgroundMusic); // Stop menu music
+
+                        }
                         currentState = FIRE;
                         initializeProjectiles(projectiles, selectedPlayers);
                     }
