@@ -5,6 +5,7 @@
 #include "raymath.h"
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 #define maxShipSpeed 100
 #define MAX_PLAYERS 6
 float countdownTimer = 3.0f; // Countdown timer for 3-2-1-Go
@@ -12,21 +13,21 @@ float roundTimer = 10.0f;
 typedef enum GameState {DIRECTION_INSTR, MOVEMENT_A, FIRE_INSTR, MOVEMENT_B, FIRE} GameState;
 typedef enum GameScreen {TITLE, PLAYER_SELECT, COUNTDOWN, GAME, SETTINGS, HOW_TO_PLAY, END} GameScreen; //All screen states
 
-struct Line {
+typedef struct Line {
     Vector2 start;
     Vector2 end;
-};
+} Line;
 struct CollisionSection {
     Vector2 centerPosition;
     int minimumDistance;
-    struct Line Lines[10];
+    Line Lines[10];
 };
 
 //Declare function prototypes
 int checkCollision(Ship ship, struct CollisionSection[], int sectionCount);
 int checkProjectileCollision(Ship ship, Projectile projectiles[]);
 int playersAlive(Ship ships[]);
-
+Line getTargetLine(Ship ships[], int shipA, int shipB);
 // Sound variables
 Music backgroundMusic;
 Music gameMusic;
@@ -51,30 +52,39 @@ int picking = 0;
 float musicVolume = 0.4f;
 float soundVolume = 0.5f;
 
+int screenWidth;
+int screenHeight;
+Camera2D camera = {0}; //Initialize 2D top down camera
+
 void main(void)
 {
+    //Open collisions.dat file in read bianry mode
     FILE *f = fopen("collisions.dat", "rb");
-
+    //Check if file was opened
     if (f == NULL) {
         perror("collisions.dat file is missing");
         return;
     }
+    //Measure file length
     fseek(f, 0, SEEK_END);
     int length = ftell(f);
+    //Check if file has contentes
     if (length <= 0) {
         perror("collisions.dat file is corrupted");
         return;
     }
+    //Create variable to store the read collision sections from the file
     struct CollisionSection readSections[length/sizeof(struct CollisionSection)];
     rewind(f);
+    //Get the data from the file and close it
     fread(&readSections, sizeof(readSections), 1, f);
     fclose(f);
 
     InitWindow(800, 800, "POLYNAYMAXIA"); //Initialize the game window
-    SetExitKey(0);
+    SetExitKey(0); //Remove exit key
     const int display = GetCurrentMonitor(); //Get which display the game is running on
-    const int screenWidth = GetMonitorWidth(display); //Get screen width
-    const int screenHeight = GetMonitorHeight(display); //Get screen height
+    screenWidth = GetMonitorWidth(display); //Get screen width
+    screenHeight = GetMonitorHeight(display); //Get screen height
     SetWindowSize(screenWidth, screenHeight); //Set the game window size to be the same as the screen size
     ToggleFullscreen(); //Set window mode to fullscreen
 
@@ -121,8 +131,8 @@ void main(void)
     UnloadImage(endImage);
 
 
-    Camera2D camera = {0}; //Initialize 2D top down camera
-    camera.zoom = (float)screenWidth/2048.0f; //Set camera zoom to 1
+    //Set camera zoom based on screen size
+    camera.zoom = (float)screenWidth/2048.0f;
 
     //Set target fps to monitor refresh rate
     SetTargetFPS(GetMonitorRefreshRate(display));
@@ -130,11 +140,9 @@ void main(void)
     Ship ships[MAX_PLAYERS]; //Create array for storing ships
     Projectile projectiles[MAX_PLAYERS]; //Create array for storing projectiles
 
-    Vector2 posBuffer; //Temporary position storage
-
     //Counter variable for showing selected ship
     double selectAnimation = 0;
-    int targetPlayer = 0;
+    int targetPlayer = 1;
     bool shouldExit = 0;
     while (!(WindowShouldClose()||shouldExit)) //While the window open
     {
@@ -175,7 +183,7 @@ void main(void)
 
             } else if (selectedOption == 3 && (IsKeyPressed(KEY_ENTER)))
             {
-                shouldExit = 1;
+                shouldExit = true;
             }
 
             BeginDrawing(); //Start rendering the screen
@@ -240,18 +248,17 @@ void main(void)
                 (Rectangle){0, 0, (float)backgroundTexture.width, (float)backgroundTexture.height},
                 (Rectangle){0, 0, (float)screenWidth, (float)screenHeight},
                 (Vector2){0, 0}, 0.0f,
-                WHITE);
+                WHITE
+            );
 
+            //Draw navigation instructions on screen
             DrawText("Select Number of Players (2 to 6)", 100, 100, 40, WHITE);
             DrawText("Press UP/DOWN arrows to choose", 100, 160, 30, WHITE);
             DrawText("Press ENTER to select", 100, 200, 30, WHITE);
 
             for (int i = 2; i <= MAX_PLAYERS; i++) {
-                if (i == selectedPlayers) {
-                    DrawText(TextFormat("> %d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 2) * 40, 40, GREEN);
-                } else {
-                    DrawText(TextFormat("%d Player%s", i, i > 1 ? "s" : ""), 100, 250 + (i - 2) * 40, 40, WHITE);
-                }
+                const char *text = TextFormat("%s%d Players", i == selectedPlayers ? "> " : "", i);
+                DrawText(text,300-MeasureText(text, 40), 250 + (i - 1) * 40, 40, i==selectedPlayers ? GREEN : WHITE);
             }
             if (selectedPlayers == totalOptions) {
                 DrawText("> Return to Main Menu", 100, 300 + (MAX_PLAYERS - 1) * 40, 40, GREEN);
@@ -269,7 +276,6 @@ void main(void)
                 currentScreen = GAME; // Transition to game screen
                 initializeShips(ships, selectedPlayers);
             }
-
             BeginDrawing();
             ClearBackground(BLACK);
             if (countdownTimer <= 0) {
@@ -287,7 +293,6 @@ void main(void)
             }
             BeginDrawing();
             ClearBackground(DARKBLUE);
-
             BeginMode2D(camera);
             DrawTexture(gameMapTexture, 0, 0, WHITE);
             switch (currentState) {
@@ -322,7 +327,6 @@ void main(void)
 
                     if (roundTimer <= 5) {
                         currentState = FIRE_INSTR;
-                        posBuffer = ships[0].position;
                         ships[0].position = Vector2Add(ships[0].position, ships[0].distanceMoved);
                     }
                     break;
@@ -331,23 +335,29 @@ void main(void)
                     selectAnimation = fmod(selectAnimation + GetFrameTime()*M_PI, M_PI*2);
                     Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), camera);
                     projectiles[picking].heading = atan2f(mousePos.y-ships[picking].position.y, mousePos.x-ships[picking].position.x);
-                    DrawRectangleV(GetScreenToWorld2D((Vector2){20,screenHeight - 40}, camera), GetScreenToWorld2D((Vector2){screenWidth-40, 20}, camera), (Color){255,255,255,255});
+                    //DrawRectangleV(GetScreenToWorld2D((Vector2){20,screenHeight - 40}, camera), GetScreenToWorld2D((Vector2){screenWidth-40, 20}, camera), (Color){255,255,255,255});
                     if (picking >= selectedPlayers) {
+                        printf("players: %d, picking: %d", selectedPlayers, picking);
                         currentState = MOVEMENT_B;
                         picking = 0;
                     }
-                    while (ships[picking].isAlive == 0) picking ++;
+                    while (ships[picking].isAlive == 0) picking++;
                     projectiles[picking].angle = fmaxf(fminf(GetMouseWheelMove()*0.01f+projectiles[picking].angle, M_PI/2), 0);
+                    if (IsKeyPressed(KEY_DOWN)) {
+                        if (--targetPlayer<0) targetPlayer = selectedPlayers;
+                        while (ships[targetPlayer].isAlive == 0 || picking == targetPlayer) --targetPlayer < 0 ? targetPlayer = selectedPlayers-1 : targetPlayer;
+                    }
+                    if (IsKeyPressed(KEY_UP)) {
+                        if (++targetPlayer>=selectedPlayers) targetPlayer = 0;
+                        while (ships[targetPlayer].isAlive == 0 || picking == targetPlayer) ++targetPlayer >= selectedPlayers ? targetPlayer = 0 : targetPlayer;
+                    }
+                    Line targetLine = getTargetLine(ships, picking,  targetPlayer);
+                    DrawLineV(targetLine.start, targetLine.end, RED);
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                        projectiles[picking].position.x = ships[picking].position.x;
-                        projectiles[picking].position.y = ships[picking].position.y;
+                        projectiles[picking].position.x = ships[picking].position.x + ships[picking].distanceMoved.x;
+                        projectiles[picking].position.y = ships[picking].position.y + ships[picking].distanceMoved.y;
                         projectiles[picking].position.z = 10;
-                        ships[picking].position = posBuffer;
-                        picking++;
-                        if (picking<selectedPlayers) {
-                            posBuffer = ships[picking].position;
-                            ships[picking].position = Vector2Add(ships[picking].position, ships[picking].distanceMoved);
-                        }
+                        targetPlayer = (++picking + 1) % (selectedPlayers);
                     }
                     break;
                 }
@@ -389,6 +399,7 @@ void main(void)
             for (int i = 0; i < selectedPlayers; i++) {
                 Ship ship = ships[i];
                 if (ship.isAlive) {
+
                     Vector2 lineStart = ship.position;
                     if (i==picking && (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)) {
                         float mouseDist = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ship.position));
@@ -402,9 +413,8 @@ void main(void)
                         (Rectangle){ship.position.x, ship.position.y, 100, 100},
                         (Vector2){50, 50},
                         ship.heading * RAD2DEG + 270,
-                        (Color){255, 255, 255, (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)&&i==picking?205-50*cos(selectAnimation) : 255});
+                        (Color){255, i==targetPlayer&&currentState==FIRE_INSTR? 128 : 255, i==targetPlayer&&currentState==FIRE_INSTR? 128 : 255, (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)&&i==picking?205-50*cos(selectAnimation) : 255});
                 }
-
             }
             for (int i = 0 ; i<selectedPlayers; i++) {
                 if (currentState == FIRE&&projectiles[i].position.z>0) DrawTexturePro(cannonBallTexture, (Rectangle){0,0, cannonBallTexture.width, cannonBallTexture.height}, (Rectangle){projectiles[i].position.x, projectiles[i].position.y, 10+0.1f*projectiles[i].position.z, 10+0.1f*projectiles[i].position.z,},(Vector2){(10+0.1f*projectiles[i].position.z)/2, (10+0.1f*projectiles[i].position.z)/2}, 0, WHITE);
@@ -462,7 +472,7 @@ void main(void)
         }
 
             case SETTINGS: {
-                    static int selectedOption = 0;
+                    static int selected_option = 0;
                     if (IsKeyPressed(KEY_UP)) {
                         PlaySound(selectionSound);
                         selectedOption = (selectedOption - 1 + 6) % 6;
@@ -511,6 +521,7 @@ void main(void)
                     }
 
                     BeginDrawing();
+
                     ClearBackground((Color){255, 255, 255, 100});
 
                     DrawText("SETTINGS MENU", 100, 100, 50, BLACK);
@@ -567,13 +578,24 @@ void main(void)
     CloseWindow();
 }
 
-struct Line getTargetLine(Ship ships[], int shipA, int shipB) {
+Line getTargetLine(Ship ships[], int shipA, int shipB) {
     Ship shipOrigin = ships[shipA];
     Ship shipTarget = ships[shipB];
-    Vector2 targetVector = Vector2Subtract(shipOrigin.position, shipTarget.position);
-    targetVector = Vector2Scale(targetVector, 2000/Vector2Length(Vector2Scale(targetVector, Vector2Length(targetVector))));
-    struct Line line;
-    //if (!CheckCollisionLines(targetVector, Vector2Negate(targetVector)))
+    shipOrigin.position = Vector2Add(shipOrigin.position, shipOrigin.distanceMoved);
+    shipTarget.position = Vector2Add(shipTarget.position, shipTarget.distanceMoved);
+    Vector2 targetVector = Vector2Subtract(shipOrigin.position,shipTarget.position);
+    targetVector = Vector2Scale(targetVector, 4000/Vector2Length(targetVector));
+    Line checkLine = {
+        Vector2Add(targetVector, shipOrigin.position),
+        Vector2Add(Vector2Negate(targetVector), shipOrigin.position),
+    };
+    DrawLineV(checkLine.start, checkLine.end, BLUE);
+    Line line  = {(Vector2){-1, -1}, (Vector2){-1, -1}};
+    CheckCollisionLines(checkLine.start, checkLine.end, (Vector2){0,0}, GetScreenToWorld2D((Vector2){screenWidth, 0}, camera), &line.start);
+    CheckCollisionLines(checkLine.start, checkLine.end, GetScreenToWorld2D((Vector2){screenWidth,0}, camera), GetScreenToWorld2D((Vector2){screenWidth, screenWidth}, camera), line.start.x==-1 ? & line.start : &line.end);
+    CheckCollisionLines(checkLine.start, checkLine.end, GetScreenToWorld2D((Vector2){0,screenHeight}, camera), GetScreenToWorld2D((Vector2){screenWidth, screenHeight}, camera), line.start.x==-1 ? & line.start : &line.end);
+    CheckCollisionLines(checkLine.start, checkLine.end, GetScreenToWorld2D((Vector2){0,0}, camera), GetScreenToWorld2D((Vector2){0, screenHeight}, camera), line.start.x==-1 ? & line.start : &line.end);
+    return line;
 }
 
 int playersAlive(Ship ships[]) {
@@ -587,7 +609,7 @@ int playersAlive(Ship ships[]) {
 int checkProjectileCollision(Ship ship, Projectile projectiles[]) {
     Vector2 shipPos = ship.position;//Position of the provided ship
     if (ship.isAlive==0) return 0;
-    struct Line shipLines[4] = { //The line segments that make up the hitbox of the ship
+    Line shipLines[4] = { //The line segments that make up the hitbox of the ship
         {
             {(-40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x),(-40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)},
            {(40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x),(40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)}
@@ -618,7 +640,7 @@ int checkProjectileCollision(Ship ship, Projectile projectiles[]) {
 
 int checkCollision(Ship ship, struct CollisionSection sections[], int sectionCount){//Checks if the provided ship is colliding with any obstacle. Returns 1 if it detects collision and 0 if it doesn't
     Vector2 shipPos = ship.position;//Position of the provided ship
-    struct Line shipLines[4] = { //The line segments that make up the hitbox of the ship
+    Line shipLines[4] = { //The line segments that make up the hitbox of the ship
         {
             {(-40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x),(-40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)},
            {(40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x),(40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)}
