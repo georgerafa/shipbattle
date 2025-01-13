@@ -330,7 +330,6 @@ void main(void)
                         }
 
                         currentState = FIRE_INSTR;
-                        ships[0].position = Vector2Add(ships[0].position, ships[0].distanceMoved);
                     }
                     break;
                 }
