@@ -58,7 +58,7 @@ Camera2D camera = {0}; //Initialize 2D top down camera
 
 void main(void)
 {
-    //Open collisions.dat file in read bianry mode
+    //Open collisions.dat file in read binary mode
     FILE *f = fopen("collisions.dat", "rb");
     //Check if file was opened
     if (f == NULL) {
@@ -287,6 +287,7 @@ void main(void)
             EndDrawing();
             break;
         case GAME:
+            // Handle pause and switch to settings menu
             if (IsKeyPressed(KEY_ESCAPE)) {
                 PlaySound(confirmSound);
                 previousScreen = GAME;
@@ -296,8 +297,10 @@ void main(void)
             ClearBackground(DARKBLUE);
             BeginMode2D(camera);
             DrawTexture(gameMapTexture, 0, 0, WHITE);
+            // Game state machine
             switch (currentState) {
                 case DIRECTION_INSTR: {
+                        // Animate selection indicator
                     selectAnimation = fmod(selectAnimation + GetFrameTime()*M_PI, M_PI*2);
                     Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), camera);
                     while (ships[picking].isAlive == 0) picking ++;
@@ -306,6 +309,7 @@ void main(void)
                         currentState = MOVEMENT_A;
                         picking = 0;
                     }
+                        // Handle mouse input to set ship speed
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         float mouseDist = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ships[picking].position));
                         mouseDist = (float)fmin(mouseDist, maxShipSpeed*2);
@@ -315,12 +319,15 @@ void main(void)
                     break;
                 }
                 case MOVEMENT_A: {
+                        // Update ship positions and countdown timer
                     updateShipPositions(ships, selectedPlayers, GetFrameTime());
                     roundTimer -=GetFrameTime();
+                        // Handle collisions and eliminate ships
                     for (int i = 0; i < selectedPlayers; i++) {
                         ships[i].isAlive = (1 - checkCollision(ships[i], readSections, length/sizeof(struct CollisionSection)))*ships[i].isAlive;
                         projectiles[i].position.z = ships[i].isAlive == 1 ? 10 : -10;
                     }
+                        // Check for end conditions
                         if (playersAlive(ships) == 0) {
                             currentScreen = END;
                             StopMusicStream(gameMusic); // Start game music
@@ -341,8 +348,10 @@ void main(void)
                     break;
                 }
                 case FIRE_INSTR: {
+                        // Animate selection indicator
                     selectAnimation = fmod(selectAnimation + GetFrameTime()*M_PI, M_PI*2);
                     Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), camera);
+                        // Update projectile heading based on mouse position
                     projectiles[picking].heading = atan2f(mousePos.y-ships[picking].position.y, mousePos.x-ships[picking].position.x);
                     //DrawRectangleV(GetScreenToWorld2D((Vector2){20,screenHeight - 40}, camera), GetScreenToWorld2D((Vector2){screenWidth-40, 20}, camera), (Color){255,255,255,255});
                     if (picking >= selectedPlayers) {
@@ -351,7 +360,10 @@ void main(void)
                         picking = 0;
                     }
                     while (ships[picking].isAlive == 0) picking++;
+                        // Adjust projectile angle
                     projectiles[picking].angle = fmaxf(fminf(GetMouseWheelMove()*0.01f+projectiles[picking].angle, M_PI/2), 0);
+
+                        // Change target with up/down arrow keys
                     if (IsKeyPressed(KEY_DOWN)) {
                         if (--targetPlayer<0) targetPlayer = selectedPlayers;
                         while (ships[targetPlayer].isAlive == 0 || picking == targetPlayer) --targetPlayer < 0 ? targetPlayer = selectedPlayers-1 : targetPlayer;
@@ -371,8 +383,11 @@ void main(void)
                     break;
                 }
                 case MOVEMENT_B: {
+                        // Similar to MOVEMENT_A, but updates for the second movement phase
                     updateShipPositions(ships, selectedPlayers, GetFrameTime());
                     roundTimer -=GetFrameTime();
+
+                        // Handle collisions
                     for (int i = 0; i < selectedPlayers; i++) {
                         ships[i].isAlive = (1 - checkCollision(ships[i], readSections, length/sizeof(struct CollisionSection)))*ships[i].isAlive;
                         projectiles[i].position.z = ships[i].isAlive == 1 ? 10 : -10;
@@ -398,12 +413,15 @@ void main(void)
                     break;
                 }
                 case FIRE: {
+                        // Update projectiles and handle collisions
                     updateProjectiles(projectiles, ships, selectedPlayers, GetFrameTime());
                     int projectilesAreAlive = 0;
+
                     for (int i = 0; i<selectedPlayers; i++) {
                         ships[i].isAlive = (1-checkProjectileCollision(ships[i], projectiles))*ships[i].isAlive;
                         if (projectiles[i].position.z>0)  projectilesAreAlive = 1;
                     }
+                        // Check end conditions or restart cycle
                     if (projectilesAreAlive==0) {
                         if (playersAlive(ships) <= 1) {
                             currentScreen = END;
@@ -422,15 +440,25 @@ void main(void)
                 }
 
             }
+
+            // Loop through all selected players to render the ships and their additional UI elements
             for (int i = 0; i < selectedPlayers; i++) {
                 Ship ship = ships[i];
+
+                // Check if the current ship is alive before drawing
                 if (ship.isAlive) {
 
                     Vector2 lineStart = ship.position;
+
+                    // Check if the current ship is the one being interacted with
                     if (i==picking && (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)) {
+                        // Calculate the distance from the ship to the mouse pointer
                         float mouseDist = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ship.position));
+                        // Adjust the mouse distance based on the current game state
                         mouseDist = currentState == FIRE_INSTR ? 200*(M_PI/2 - projectiles[i].angle)/(M_PI/2) : fminf(mouseDist, maxShipSpeed*2);
+                        // Draw a visual indicator of the ship's movement or firing direction
                         DrawRectanglePro((Rectangle){ship.position.x, ship.position.y, 10, mouseDist}, (Vector2){5,0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading) * RAD2DEG + 270, WHITE);
+                        // Draw a triangular arrow indicating direction
                         DrawTriangle(Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist, -10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist, 10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist+40, 0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), WHITE);
                     }
                     DrawTexturePro(
@@ -442,7 +470,9 @@ void main(void)
                         (Color){255, i==targetPlayer&&currentState==FIRE_INSTR? 128 : 255, i==targetPlayer&&currentState==FIRE_INSTR? 128 : 255, (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)&&i==picking?205-50*cos(selectAnimation) : 255});
                 }
             }
+            // Loop through all projectiles to render them if they are active
             for (int i = 0 ; i<selectedPlayers; i++) {
+                // Check if the current projectile is active (z > 0 indicates it's in play)
                 if (currentState == FIRE&&projectiles[i].position.z>0) DrawTexturePro(cannonBallTexture, (Rectangle){0,0, cannonBallTexture.width, cannonBallTexture.height}, (Rectangle){projectiles[i].position.x, projectiles[i].position.y, 10+0.1f*projectiles[i].position.z, 10+0.1f*projectiles[i].position.z,},(Vector2){(10+0.1f*projectiles[i].position.z)/2, (10+0.1f*projectiles[i].position.z)/2}, 0, WHITE);
             }
 
@@ -615,8 +645,11 @@ void main(void)
 }
 
 Line getTargetLine(Ship ships[], int shipA, int shipB) {
+    // Retrieve the origin and target ships from the ships array
     Ship shipOrigin = ships[shipA];
     Ship shipTarget = ships[shipB];
+
+    // Update the positions of the origin and target ships to account for their movement
     shipOrigin.position = Vector2Add(shipOrigin.position, shipOrigin.distanceMoved);
     shipTarget.position = Vector2Add(shipTarget.position, shipTarget.distanceMoved);
     Vector2 targetVector = Vector2Subtract(shipOrigin.position,shipTarget.position);
@@ -627,6 +660,9 @@ Line getTargetLine(Ship ships[], int shipA, int shipB) {
     };
     DrawLineV(checkLine.start, checkLine.end, BLUE);
     Line line  = {(Vector2){-1, -1}, (Vector2){-1, -1}};
+
+    // Check for collisions between the line and each edge of the screen
+    // Check top edge of the screen
     CheckCollisionLines(checkLine.start, checkLine.end, (Vector2){0,0}, GetScreenToWorld2D((Vector2){screenWidth, 0}, camera), &line.start);
     CheckCollisionLines(checkLine.start, checkLine.end, GetScreenToWorld2D((Vector2){screenWidth,0}, camera), GetScreenToWorld2D((Vector2){screenWidth, screenWidth}, camera), line.start.x==-1 ? & line.start : &line.end);
     CheckCollisionLines(checkLine.start, checkLine.end, GetScreenToWorld2D((Vector2){0,screenHeight}, camera), GetScreenToWorld2D((Vector2){screenWidth, screenHeight}, camera), line.start.x==-1 ? & line.start : &line.end);
