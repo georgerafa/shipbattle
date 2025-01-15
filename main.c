@@ -180,6 +180,7 @@ void main(void)
                 PlaySound(confirmSound);
                 previousScreen = TITLE;
                 currentScreen = SETTINGS;
+                selectedOption = 0;
 
             } else if (selectedOption == 3 && (IsKeyPressed(KEY_ENTER)))
             {
