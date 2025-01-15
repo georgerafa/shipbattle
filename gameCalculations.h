@@ -1,5 +1,7 @@
 #ifndef GAMECALCULATIONS_H
 #define GAMECALCULATIONS_H
+#define PROJECTILE_SPEED  200.0f //The initial projectile speed
+#define GRAVITY  45.0f //Gravitational acceleration
 typedef struct ShipStruct {
     int team; //Ship team
     Vector2 position; //Current ship position
@@ -17,7 +19,7 @@ typedef struct ProjectileStruct {
     float angle; //Elevation angle in radians
 } Projectile;
 
-float getLinePoint(Projectile p, float x);
+int getLinePoint(Projectile p, int x);
 void updateShipPositions(Ship *ships, int shipCount, float deltaT);
 void updateProjectiles(Projectile *projectiles, Ship *ships, int projectileCount, float deltaT);
 void initializeProjectiles(Projectile *projectiles, int projectileCount);

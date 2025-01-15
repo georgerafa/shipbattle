@@ -2,11 +2,12 @@
 #include "raylib.h"
 #include "gameCalculations.h"
 
+#include <stdio.h>
+
 #include "raymath.h"
 typedef struct ShipStruct Ship;
 typedef struct ProjectileStruct Projectile;
-const float PROJECTILE_SPEED = 200.0f; //The initial projectile speed
-const float GRAVITY = 45.0f; //Gravitational acceleration
+
 #define MAX_PLAYERS 6
 struct SpawnPosition {
     Vector2 position;
@@ -34,9 +35,9 @@ struct SpawnPosition {
 };
 
 
-float getLinePoint(Projectile p, float x) {
-    float t = x/Vector2Length((Vector2){p.speed.x, p.speed.y});
-    return 15 + sinf(p.angle)*PROJECTILE_SPEED*t - 0.5f*GRAVITY*t*t;
+int getLinePoint(Projectile p, int x) {
+    float t = x/(PROJECTILE_SPEED*cosf(p.angle));
+    return (int)(10 + sinf(p.angle)*PROJECTILE_SPEED*t - 0.5*GRAVITY*t*t);
 }
 
 //Updates the positions of the ships provided based on their current position, speed, and time passed (deltaT in seconds) since last update;

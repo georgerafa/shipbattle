@@ -462,7 +462,22 @@ void main(void)
             }
             for (int i = 0 ; i<selectedPlayers; i++) {
                 if (currentState == FIRE&&projectiles[i].position.z>0) DrawTexturePro(cannonBallTexture, (Rectangle){0,0, cannonBallTexture.width, cannonBallTexture.height}, (Rectangle){projectiles[i].position.x, projectiles[i].position.y, 10+0.1f*projectiles[i].position.z, 10+0.1f*projectiles[i].position.z,},(Vector2){(10+0.1f*projectiles[i].position.z)/2, (10+0.1f*projectiles[i].position.z)/2}, 0, WHITE);
+                if (currentState == FIRE_INSTR) {
+                    float initialZspeed = PROJECTILE_SPEED*sinf(projectiles[picking].angle);
+                    float maxDistance = PROJECTILE_SPEED*cosf(projectiles[picking].angle)*((initialZspeed+sqrtf(20*GRAVITY+initialZspeed*initialZspeed))/GRAVITY);
+                    for (float p  = 0; p <= 30; p++) {
+                        float xPos = p*maxDistance/30;
+                        Ship ship = ships[picking];
+                        float initialX = xPos;
+                        float initialY = getLinePoint(projectiles[picking], xPos);
+                        float projectileHeading = projectiles[picking].heading;
+                        float rotatedX = initialX*cosf(projectileHeading) - initialY*sinf(projectileHeading);
+                        float rotatedY = initialX*sinf(projectileHeading) + initialY*cosf(projectileHeading);
+                        DrawCircle(rotatedX+ship.position.x+ship.distanceMoved.x, rotatedY+ship.position.y+ship.distanceMoved.y, 3, initialY<=15 ? RED : BLACK);
+                    }
+                }
             }
+
             EndMode2D();
             EndDrawing();
             break;
@@ -655,20 +670,20 @@ int checkProjectileCollision(Ship ship, Projectile projectiles[]) {
     if (ship.isAlive==0) return 0;
     Line shipLines[4] = { //The line segments that make up the hitbox of the ship
         {
-            {(-40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x),(-40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)},
-           {(40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x),(40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)}
+            {-40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x,-40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y},
+           {40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x,40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y}
         },
         {
-                {(-40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (-40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)},
-                {(40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)}
+                        {-40*cosf(ship.heading)-7*sinf(ship.heading)+shipPos.x,-40*sinf(ship.heading)+7*cosf(ship.heading)+shipPos.y},
+                        {40*cosf(ship.heading)-7*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)+7*cosf(ship.heading)+shipPos.y}
         },
         {
-                {(-40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x), (-40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)},
-                {(-40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (-40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)}
+                        {-40*cosf(ship.heading)+7*sinf(ship.heading)+shipPos.x, -40*sinf(ship.heading)-7*cosf(ship.heading)+shipPos.y},
+                        {40*cosf(ship.heading)+7*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)-7*cosf(ship.heading)+shipPos.y}
         },
         {
-                {40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y},
-                {(40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)}
+                        {-40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x, -40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y},
+                        {40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y}
         }
     };
     for (int i = 0; i < selectedPlayers; i++) {
@@ -702,6 +717,7 @@ int checkCollision(Ship ship, struct CollisionSection sections[], int sectionCou
             {(40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)}
         }
     };
+
     for (int i = 0; i < sectionCount; i++) {//Iterate through all obstacles
         struct CollisionSection section = sections[i]; //Current obstacle
         Vector2 centerPos = section.centerPosition; //Obstacle offset from (0,0)
