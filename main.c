@@ -121,7 +121,7 @@ void main(void)
     backgroundTexture = LoadTextureFromImage(backgroundImage);
     shipTexture = LoadTextureFromImage(shipImage);
     cannonBallTexture = LoadTextureFromImage(cannonBall);
-    Texture endTexture = LoadTextureFromImage(endImage);
+    endTexture = LoadTextureFromImage(endImage);
 
     //Unload images
     UnloadImage(gameMapImage);
@@ -354,7 +354,6 @@ void main(void)
                     Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), camera);
                     // Update projectile heading based on mouse position
                     projectiles[picking].heading = atan2f(mousePos.y-ships[picking].position.y, mousePos.x-ships[picking].position.x);
-                    //DrawRectangleV(GetScreenToWorld2D((Vector2){20,screenHeight - 40}, camera), GetScreenToWorld2D((Vector2){screenWidth-40, 20}, camera), (Color){255,255,255,255});
                     if (picking >= selectedPlayers) {
                         printf("players: %d, picking: %d", selectedPlayers, picking);
                         currentState = MOVEMENT_B;
@@ -434,33 +433,23 @@ void main(void)
                         }
                         else {
                             currentState = DIRECTION_INSTR;
+                            roundTimer = 10.0f;
                             for (int i = 0 ; i<selectedPlayers; i++) {
                                 ships[i].distanceMoved = (Vector2){0};
                             }
                         }
                     }
                 }
-
             }
-
-            // Loop through all selected players to render the ships and their additional UI elements
             for (int i = 0; i < selectedPlayers; i++) {
                 Ship ship = ships[i];
-
-                // Check if the current ship is alive before drawing
                 if (ship.isAlive) {
                     Vector2 lineStart = ship.position;
-
-                    // Check if the current ship is the one being interacted with
                     if (i==picking && (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)) {
-                        // Calculate the distance from the ship to the mouse pointer
-                        float mouseDist = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ship.position));
-                        // Adjust the mouse distance based on the current game state
-                        mouseDist = currentState == FIRE_INSTR ? 200*(M_PI/2 - projectiles[i].angle)/(M_PI/2) : fminf(mouseDist, maxShipSpeed*2);
-                        // Draw a visual indicator of the ship's movement or firing direction
-                        DrawRectanglePro((Rectangle){ship.position.x, ship.position.y, 10, mouseDist}, (Vector2){5,0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading) * RAD2DEG + 270, WHITE);
-                        // Draw a triangular arrow indicating direction
-                        DrawTriangle(Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist, -10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist, 10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){mouseDist+40, 0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), WHITE);
+                        float arrowLength = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ship.position));
+                        arrowLength = currentState == FIRE_INSTR ? 200*(M_PI/2 - projectiles[i].angle)/(M_PI/2) : fminf(arrowLength, maxShipSpeed*2);
+                        DrawRectanglePro((Rectangle){ship.position.x, ship.position.y, 10, arrowLength}, (Vector2){5,0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading) * RAD2DEG + 270, WHITE);
+                        DrawTriangle(Vector2Add(lineStart, Vector2Rotate((Vector2){arrowLength, -10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){arrowLength, 10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){arrowLength+40, 0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), WHITE);
                     }
                     DrawTexturePro(
                         shipTexture,
@@ -471,12 +460,9 @@ void main(void)
                         (Color){255, i==targetPlayer&&currentState==FIRE_INSTR? 128 : 255, i==targetPlayer&&currentState==FIRE_INSTR? 128 : 255, (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)&&i==picking?205-50*cos(selectAnimation) : 255});
                 }
             }
-            // Loop through all projectiles to render them if they are active
             for (int i = 0 ; i<selectedPlayers; i++) {
-                // Check if the current projectile is active (z > 0 indicates it's in play)
                 if (currentState == FIRE&&projectiles[i].position.z>0) DrawTexturePro(cannonBallTexture, (Rectangle){0,0, cannonBallTexture.width, cannonBallTexture.height}, (Rectangle){projectiles[i].position.x, projectiles[i].position.y, 10+0.1f*projectiles[i].position.z, 10+0.1f*projectiles[i].position.z,},(Vector2){(10+0.1f*projectiles[i].position.z)/2, (10+0.1f*projectiles[i].position.z)/2}, 0, WHITE);
             }
-
             EndMode2D();
             EndDrawing();
             break;
@@ -637,11 +623,8 @@ void main(void)
 }
 
 Line getTargetLine(Ship ships[], int shipA, int shipB) {
-    // Retrieve the origin and target ships from the ships array
     Ship shipOrigin = ships[shipA];
     Ship shipTarget = ships[shipB];
-
-    // Update the positions of the origin and target ships to account for their movement
     shipOrigin.position = Vector2Add(shipOrigin.position, shipOrigin.distanceMoved);
     shipTarget.position = Vector2Add(shipTarget.position, shipTarget.distanceMoved);
     Vector2 targetVector = Vector2Subtract(shipOrigin.position,shipTarget.position);
@@ -652,9 +635,6 @@ Line getTargetLine(Ship ships[], int shipA, int shipB) {
     };
     DrawLineV(checkLine.start, checkLine.end, BLUE);
     Line line  = {(Vector2){-1, -1}, (Vector2){-1, -1}};
-
-    // Check for collisions between the line and each edge of the screen
-    // Check top edge of the screen
     CheckCollisionLines(checkLine.start, checkLine.end, (Vector2){0,0}, GetScreenToWorld2D((Vector2){screenWidth, 0}, camera), &line.start);
     CheckCollisionLines(checkLine.start, checkLine.end, GetScreenToWorld2D((Vector2){screenWidth,0}, camera), GetScreenToWorld2D((Vector2){screenWidth, screenWidth}, camera), line.start.x==-1 ? & line.start : &line.end);
     CheckCollisionLines(checkLine.start, checkLine.end, GetScreenToWorld2D((Vector2){0,screenHeight}, camera), GetScreenToWorld2D((Vector2){screenWidth, screenHeight}, camera), line.start.x==-1 ? & line.start : &line.end);
