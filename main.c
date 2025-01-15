@@ -576,7 +576,16 @@ void main(void)
                     BeginDrawing();
                     ClearBackground((Color){255, 255, 255, 100});
                     DrawText("HOW TO PLAY", 100, 100, 50, BLACK);
-                    DrawText("Press ESC to return to the Settings Menu", 100, 450, 20, BLACK);
+                    DrawText("Control the ship movement by setting up the direction with your mouse and left click to perform the movement.",100, 200, 30, BLACK);
+                    DrawText ("Avoid obstacles and other ships, as any collision or hit can knock you out.",100, 250, 30, BLACK );
+                    DrawText ("The ships movement is paused mid-game and you are given the ability to fire a shot ",100, 350, 30, BLACK) ;
+                    DrawText ("as well as a helpful red line for each pair of ships indicating their final positions between them.",100, 400, 30, BLACK );
+                    DrawText ("You can wander around each opponent's final position relative to yours by pressing the up and down arrows.",100, 500, 30, BLACK );
+                    DrawText("To attack, aim based on the final positions of the ships and fire using Left click.", 100, 550, 30, BLACK);
+                    DrawText ("Adjust the firing angle with the scroll wheel. After the pause, the ships movement continues, ",100, 650, 30, BLACK );
+                    DrawText ("while at the end of the movement the shots are fired. ",100, 700, 30, BLACK );
+                    DrawText ("The process repeats until a player is crowned the winner of the game or until all players are eliminated.", 100, 800, 30, BLACK  );
+                    DrawText("Press ESC to return to the Settings Menu", 100, 900, 20, BLACK);
 
                     EndDrawing();
 
