@@ -33,6 +33,12 @@ struct SpawnPosition {
     }
 };
 
+
+float getLinePoint(Projectile p, float x) {
+    float t = x/Vector2Length(Vector2{p.speed.x, p.speed.y});
+    return 15 + sinf(p.angle)*PROJECTILE_SPEED*t - 0.5f*GRAVITY*t*t;
+}
+
 //Updates the positions of the ships provided based on their current position, speed, and time passed (deltaT in seconds) since last update;
 void updateShipPositions(Ship *ships, int shipCount, float deltaT) {
     for (int i = 0; i < shipCount; i++) {
@@ -47,7 +53,7 @@ void updateShipPositions(Ship *ships, int shipCount, float deltaT) {
 
 //Initializes the ships provided by setting their heading and speed values to 0 as well as setting their initial position
 void initializeShips(Ship *ships, int shipCount) {
-    for (int i = 0; i < MAX_PLAYERS; i++) {
+    for (int i = 0; i < shipCount; i++) {
         ships[i] = (Ship){i, spawnPositions[i].position, 0, spawnPositions[i].heading, 1, 0};  // Initialize ships with offset positions
     }
 }
@@ -59,6 +65,7 @@ void initializeProjectiles(Projectile *projectiles, int projectileCount) { //Ini
         projectiles[i].speed.y = sinf(projectiles[i].heading)*cosf(projectiles[i].angle)*PROJECTILE_SPEED;
         projectiles[i].speed.z = sinf(projectiles[i].angle)*PROJECTILE_SPEED;
         projectiles[i].team = i;
+        projectiles[i].angle = 0;
     }
 }
 

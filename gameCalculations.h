@@ -17,6 +17,7 @@ typedef struct ProjectileStruct {
     float angle; //Elevation angle in radians
 } Projectile;
 
+float getLinePoint(Projectile p, float x);
 void updateShipPositions(Ship *ships, int shipCount, float deltaT);
 void updateProjectiles(Projectile *projectiles, Ship *ships, int projectileCount, float deltaT);
 void initializeProjectiles(Projectile *projectiles, int projectileCount);
