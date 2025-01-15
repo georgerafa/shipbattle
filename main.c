@@ -225,6 +225,10 @@ void main(void)
                     countdownTimer = 3;
                     PlayMusicStream(gameMusic);
                     StopMusicStream(backgroundMusic);
+                    roundTimer = 10.0f;
+                    targetPlayer = 1;
+                    currentState = DIRECTION_INSTR;
+                    selectAnimation = 0;
                 } else if (selectedPlayers == totalOptions) {
                     currentScreen = TITLE;
                 }
@@ -403,6 +407,7 @@ void main(void)
                         if (projectiles[i].position.z>0)  projectilesAreAlive = 1;
                     }
                     if (projectilesAreAlive==0) {
+
                         if (playersAlive(ships) <= 1) {
                             currentScreen = END;
                             StopMusicStream(gameMusic); // Start game music
@@ -411,7 +416,6 @@ void main(void)
                         }
                         else {
                             currentState = DIRECTION_INSTR;
-                            roundTimer = 10.0f;
                             for (int i = 0 ; i<selectedPlayers; i++) {
                                 ships[i].distanceMoved = (Vector2){0};
                             }
@@ -423,7 +427,6 @@ void main(void)
             for (int i = 0; i < selectedPlayers; i++) {
                 Ship ship = ships[i];
                 if (ship.isAlive) {
-
                     Vector2 lineStart = ship.position;
                     if (i==picking && (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)) {
                         float mouseDist = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ship.position));
@@ -470,13 +473,11 @@ void main(void)
                     DrawText("Draw", screenWidth / 2 - MeasureText("Draw", 100) / 2, 150, 100, BLACK);
                 }
 
-
                 DrawText("Press Enter to return to the main menu.", screenWidth / 2 - MeasureText("Press Enter to return to the main menu.", 30) / 2, 50, 30, WHITE);
 
                 if (IsKeyPressed(KEY_ENTER)) {
                     currentScreen =TITLE;
                     currentState = DIRECTION_INSTR;
-                    roundTimer = 10.0f;
 
                     for (int i = 0; i < selectedPlayers; i++) {
                         ships[i].isAlive = 1;
@@ -484,9 +485,7 @@ void main(void)
                         ships[i].distanceMoved = (Vector2){0};
                         projectiles[i].position = (Vector3){-10, -10, -10};
                     }
-
                 }
-
                 if (IsKeyPressed(KEY_ESCAPE))
                 {
                     shouldExit = 1;
@@ -572,8 +571,7 @@ void main(void)
                     DrawText ("Avoid obstacles and other ships, as any collision or hit can knock you out.",100, 250, 30, BLACK );
                     DrawText ("The ships movement is paused mid-game and you are given the ability to fire a shot ",100, 350, 30, BLACK) ;
                     DrawText ("as well as a helpful red line for each pair of ships indicating their final positions between them.",100, 400, 30, BLACK );
-
-            DrawText ("You can wander around each opponent's final position relative to yours by pressing the up and down arrows.",100, 500, 30, BLACK );
+                    DrawText ("You can wander around each opponent's final position relative to yours by pressing the up and down arrows.",100, 500, 30, BLACK );
                     DrawText("To attack, aim based on the final positions of the ships and fire using Left click.", 100, 550, 30, BLACK);
                     DrawText ("Adjust the firing angle with the scroll wheel. After the pause, the ships movement continues, ",100, 650, 30, BLACK );
                     DrawText ("while at the end of the movement the shots are fired. ",100, 700, 30, BLACK );
