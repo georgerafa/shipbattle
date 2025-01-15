@@ -567,6 +567,7 @@ void main(void)
                         currentScreen = TITLE;
                         StopMusicStream(gameMusic); // Start game music
                         PlayMusicStream(backgroundMusic); // Stop menu music
+                        selectedOption=0;
 
                     } else if (selectedOption == 5 && IsKeyPressed(KEY_ENTER))
                     {
