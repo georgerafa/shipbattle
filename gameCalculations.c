@@ -35,7 +35,7 @@ struct SpawnPosition {
 
 
 float getLinePoint(Projectile p, float x) {
-    float t = x/Vector2Length(Vector2{p.speed.x, p.speed.y});
+    float t = x/Vector2Length((Vector2){p.speed.x, p.speed.y});
     return 15 + sinf(p.angle)*PROJECTILE_SPEED*t - 0.5f*GRAVITY*t*t;
 }
 
