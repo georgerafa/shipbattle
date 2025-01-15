@@ -199,15 +199,10 @@ void main(void)
 
             //Write some text on the screen
             DrawText("Welcome to Mononaumaxia!", 100, 150, 50, WHITE);
-            DrawText(TextFormat("New Game"), 100, 250, 30,
-         selectedOption == 0 ? WHITE : BLACK);
-            DrawText(TextFormat("Resume game"), 100, 300, 30,
-                     selectedOption == 1 ? WHITE : BLACK);
-            DrawText("Options", 100, 350, 30,
-                     selectedOption == 2 ? WHITE : BLACK);
-            DrawText("Exit", 100, 400, 30,
-         selectedOption == 3 ? WHITE : BLACK);
-
+            DrawText(TextFormat("New Game"), 100, 250, 30, selectedOption == 0 ? WHITE : BLACK);
+            DrawText(TextFormat("Resume game"), 100, 300, 30, selectedOption == 1 ? WHITE : BLACK);
+            DrawText("Options", 100, 350, 30, selectedOption == 2 ? WHITE : BLACK);
+            DrawText("Exit", 100, 400, 30, selectedOption == 3 ? WHITE : BLACK);
 
             EndDrawing();//Stop drawing screen
             break;
@@ -317,16 +312,17 @@ void main(void)
                 case MOVEMENT_A: {
                     updateShipPositions(ships, selectedPlayers, GetFrameTime());
                     roundTimer -=GetFrameTime();
+                    Vector2 mapBounds = GetScreenToWorld2D((Vector2){screenWidth, screenHeight}, camera);
                     for (int i = 0; i < selectedPlayers; i++) {
+                        if (ships[i].position.x > mapBounds.x || ships[i].position.y > mapBounds.y) ships[i].isAlive = 0;
                         ships[i].isAlive = (1 - checkCollision(ships[i], readSections, length/sizeof(struct CollisionSection)))*ships[i].isAlive;
                         projectiles[i].position.z = ships[i].isAlive == 1 ? 10 : -10;
                     }
-                        if (playersAlive(ships) == 0) {
-                            currentScreen = END;
-                            StopMusicStream(gameMusic); // Start game music
-                            PlayMusicStream(backgroundMusic); // Stop menu music
-
-                        }
+                    if (playersAlive(ships) == 0) {
+                        currentScreen = END;
+                        StopMusicStream(gameMusic); // Start game music
+                        PlayMusicStream(backgroundMusic); // Stop menu music
+                    }
 
                     if (roundTimer <= 5) {
                         if (playersAlive(ships) <= 1) {
@@ -374,6 +370,8 @@ void main(void)
                     updateShipPositions(ships, selectedPlayers, GetFrameTime());
                     roundTimer -=GetFrameTime();
                     for (int i = 0; i < selectedPlayers; i++) {
+                        Vector2 mapBounds = GetScreenToWorld2D((Vector2){screenWidth,  screenHeight}, camera);
+                        if (ships[i].position.x > mapBounds.x || ships[i].position.y > mapBounds.y) ships[i].isAlive = 0;
                         ships[i].isAlive = (1 - checkCollision(ships[i], readSections, length/sizeof(struct CollisionSection)))*ships[i].isAlive;
                         projectiles[i].position.z = ships[i].isAlive == 1 ? 10 : -10;
                     }
@@ -552,18 +550,12 @@ void main(void)
                     ClearBackground((Color){255, 255, 255, 100});
 
                     DrawText("SETTINGS MENU", 100, 100, 50, BLACK);
-                    DrawText(TextFormat("Return"), 100, 200, 30,
-                             selectedOption == 0 ? RED : BLACK);
-                    DrawText(TextFormat("Music Volume: %.1f", musicVolume), 100, 250, 30,
-                             selectedOption == 1 ? RED : BLACK);
-                    DrawText(TextFormat("Sound Volume: %.1f", soundVolume), 100, 300, 30,
-                             selectedOption == 2 ? RED : BLACK);
-                    DrawText("How to Play Instructions", 100, 350, 30,
-                             selectedOption == 3 ? RED : BLACK);
-                    DrawText(TextFormat("Go To Main Menu"), 100, 400, 30,
-                        selectedOption == 4 ? RED : BLACK);
-                    DrawText(TextFormat("Exit to desktop"), 100, 450, 30,
-                        selectedOption == 5 ? RED : BLACK);
+                    DrawText(TextFormat("Return"), 100, 200, 30, selectedOption == 0 ? RED : BLACK);
+                    DrawText(TextFormat("Music Volume: %.1f", musicVolume), 100, 250, 30, selectedOption == 1 ? RED : BLACK);
+                    DrawText(TextFormat("Sound Volume: %.1f", soundVolume), 100, 300, 30, selectedOption == 2 ? RED : BLACK);
+                    DrawText("How to Play Instructions", 100, 350, 30, selectedOption == 3 ? RED : BLACK);
+                    DrawText(TextFormat("Go To Main Menu"), 100, 400, 30, selectedOption == 4 ? RED : BLACK);
+                    DrawText(TextFormat("Exit to desktop"), 100, 450, 30, selectedOption == 5 ? RED : BLACK);
                     DrawText("Use UP/DOWN to navigate, LEFT/RIGHT to adjust", 100, 550, 20, BLACK);
                     DrawText("Press ENTER to select, ESC to return", 100, 600, 20, BLACK);
 
@@ -580,7 +572,8 @@ void main(void)
                     DrawText ("Avoid obstacles and other ships, as any collision or hit can knock you out.",100, 250, 30, BLACK );
                     DrawText ("The ships movement is paused mid-game and you are given the ability to fire a shot ",100, 350, 30, BLACK) ;
                     DrawText ("as well as a helpful red line for each pair of ships indicating their final positions between them.",100, 400, 30, BLACK );
-                    DrawText ("You can wander around each opponent's final position relative to yours by pressing the up and down arrows.",100, 500, 30, BLACK );
+
+            DrawText ("You can wander around each opponent's final position relative to yours by pressing the up and down arrows.",100, 500, 30, BLACK );
                     DrawText("To attack, aim based on the final positions of the ships and fire using Left click.", 100, 550, 30, BLACK);
                     DrawText ("Adjust the firing angle with the scroll wheel. After the pause, the ships movement continues, ",100, 650, 30, BLACK );
                     DrawText ("while at the end of the movement the shots are fired. ",100, 700, 30, BLACK );
