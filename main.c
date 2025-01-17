@@ -9,8 +9,13 @@
 
 float countdownTimer = 3.0f; // Countdown timer for 3-2-1-Go
 float roundTimer = 10.0f;
+
+struct {
+    bool enableTargetLine;
+    float musicVolume;
+    float soundVolume;
+} settings = {true, 0.5f, 0.5f};
 bool isMidGame = false;
-bool enableTargetLine = true;
 
 typedef enum GameState {DIRECTION_INSTR, MOVEMENT_A, FIRE_INSTR, MOVEMENT_B, FIRE} GameState;
 typedef enum GameScreen {TITLE, PLAYER_SELECT, COUNTDOWN, GAME, SETTINGS, HOW_TO_PLAY, END} GameScreen; //All screen states
@@ -34,6 +39,9 @@ int playersAlive(Ship ships[]);
 Line getTargetLine(Ship ships[], int shipA, int shipB);
 void saveGame(Ship *ships, Projectile *projectiles, int selectedPlayers, int targetPlayer, int picking, float roundTimer, GameState gameState);
 bool loadGame(Ship *ships, Projectile *projectiles, int *selectedPlayers, int *targetPlayer, int *picking, float *roundTimer, GameState *gameState);
+void saveSettings();
+void loadSettings();
+
 
 // Sound variables
 Music backgroundMusic;
@@ -57,11 +65,9 @@ GameScreen nextScreen = PLAYER_SELECT;
 int selectedPlayers = 2; //The number of players to use
 int picking = 0; //The player currently picking movement or firing instructions
 
-float musicVolume = 0.4f;
-float soundVolume = 0.5f;
-
 int screenWidth;
 int screenHeight;
+
 Camera2D camera = {0}; //Initialize 2D top down camera
 
 void main(void){
@@ -87,7 +93,7 @@ void main(void){
     //Get the data from the file and close it
     fread(&readSections, sizeof(readSections), 1, f);
     fclose(f);
-
+    loadSettings();
     InitWindow(800, 800, "POLYNAYMAXIA"); //Initialize the game window
     SetExitKey(0); //Remove exit key
 
@@ -99,7 +105,6 @@ void main(void){
     SetTargetFPS(GetMonitorRefreshRate(display));
     SetWindowSize(screenWidth, screenHeight); //Set the game window size to be the same as the screen size
     ToggleFullscreen(); //Set window mode to fullscreen
-
     //Set camera zoom based on screen size
     camera.zoom = (float)screenWidth/2048.0f;
     const Vector2 mapBounds = GetScreenToWorld2D((Vector2){screenWidth, screenHeight}, camera);
@@ -118,10 +123,10 @@ void main(void){
     confirmSound = LoadSound("assets/confirm.wav");
 
     //Set volume
-    SetMusicVolume(gameMusic,0.2f);
-    SetSoundVolume(selectionSound, 0.5f);
-    SetSoundVolume(confirmSound, 0.5f);
-    SetMusicVolume(backgroundMusic, 0.4f);
+    SetMusicVolume(gameMusic,settings.musicVolume);
+    SetSoundVolume(selectionSound, settings.soundVolume);
+    SetSoundVolume(confirmSound, settings.soundVolume);
+    SetMusicVolume(backgroundMusic, settings.musicVolume);
 
     //Start playing main menu music
     PlayMusicStream(backgroundMusic);
@@ -382,7 +387,7 @@ void main(void){
                         targetLine = getTargetLine(ships, picking,  targetPlayer);
                     }
 
-                    if (enableTargetLine) DrawLineV(targetLine.start, targetLine.end, RED);
+                    if (settings.enableTargetLine) DrawLineV(targetLine.start, targetLine.end, RED);
 
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         projectiles[picking].position.x = ships[picking].position.x + ships[picking].distanceMoved.x;
@@ -535,15 +540,15 @@ void main(void){
                 if (IsKeyPressed(KEY_LEFT)||IsKeyPressed(KEY_RIGHT)) {
                     if (selectedOption == 2) {
                         PlaySound(selectionSound);
-                        musicVolume = IsKeyPressed(KEY_RIGHT) ? fminf(musicVolume + 0.1f, 1.0f) : fmaxf(musicVolume - 0.1f, 0.0f);
-                        SetMusicVolume(backgroundMusic, musicVolume);
-                        SetMusicVolume(gameMusic, musicVolume);
+                        settings.musicVolume = IsKeyPressed(KEY_RIGHT) ? fminf(settings.musicVolume + 0.1f, 1.0f) : fmaxf(settings.musicVolume - 0.1f, 0.0f);
+                        SetMusicVolume(backgroundMusic, settings.musicVolume);
+                        SetMusicVolume(gameMusic, settings.musicVolume);
                     }
                     if (selectedOption == 3) {
                         PlaySound(selectionSound);
-                        soundVolume = IsKeyPressed(KEY_RIGHT) ? fminf(soundVolume + 0.1f, 1.0f) : fmaxf(soundVolume - 0.1f, 0.0f);
-                        SetMusicVolume(backgroundMusic, soundVolume);
-                        SetMusicVolume(gameMusic, soundVolume);
+                        settings.soundVolume = IsKeyPressed(KEY_RIGHT) ? fminf(settings.soundVolume + 0.1f, 1.0f) : fmaxf(settings.soundVolume - 0.1f, 0.0f);
+                        SetMusicVolume(backgroundMusic, settings.soundVolume);
+                        SetMusicVolume(gameMusic, settings.soundVolume);
                     }
                 }
                 else if (IsKeyPressed(KEY_ENTER)) {
@@ -553,7 +558,7 @@ void main(void){
                             currentScreen= previousScreen;
                             break;
                         case 1:
-                            enableTargetLine = !enableTargetLine;
+                            settings.enableTargetLine = !settings.enableTargetLine;
                             break;
                         case 4:
                             currentScreen = HOW_TO_PLAY;
@@ -581,9 +586,9 @@ void main(void){
                 ClearBackground((Color){255, 255, 255, 100});
                 DrawText("SETTINGS MENU", 100, 100, 50, BLACK);
                 DrawText("Return", 100, 200, 30, selectedOption == 0 ? RED : BLACK);
-                DrawText(TextFormat("%s", enableTargetLine ? "Target line enabled" : "Target line disabled"), 100, 250, 30, selectedOption == 1? RED : BLACK);
-                DrawText(TextFormat("Music Volume: %.1f", musicVolume), 100, 300, 30, selectedOption == 2 ? RED : BLACK);
-                DrawText(TextFormat("Sound Volume: %.1f", soundVolume), 100, 350, 30, selectedOption == 3 ? RED : BLACK);
+                DrawText(TextFormat("%s", settings.enableTargetLine ? "Target line enabled" : "Target line disabled"), 100, 250, 30, selectedOption == 1? RED : BLACK);
+                DrawText(TextFormat("Music Volume: %.1f", settings.musicVolume), 100, 300, 30, selectedOption == 2 ? RED : BLACK);
+                DrawText(TextFormat("Sound Volume: %.1f", settings.soundVolume), 100, 350, 30, selectedOption == 3 ? RED : BLACK);
                 DrawText("How to Play Instructions", 100, 400, 30, selectedOption == 4 ? RED : BLACK);
                 DrawText(TextFormat("Go To Main Menu"), 100, 450, 30, selectedOption == 5 ? RED : BLACK);
                 DrawText(TextFormat("Exit to desktop"), 100, 500, 30, selectedOption == 6 ? RED : BLACK);
@@ -631,7 +636,7 @@ void main(void){
     CloseAudioDevice();
 
     if (isMidGame) saveGame(ships, projectiles, selectedPlayers, targetPlayer, picking, roundTimer, currentState);
-
+    saveSettings();
     //Close the window
     CloseWindow();
 }
@@ -797,8 +802,7 @@ int checkTerrainCollision(Ship ship, struct CollisionSection sections[], int sec
 }
 
 void saveGame(Ship *ships, Projectile *projectiles, int selectedPlayers, int targetPlayer, int picking, float roundTimer, GameState gameState) {
-    FILE *f;
-    f = fopen("save.dat", "wb");
+    FILE *f = fopen("save.dat", "wb");
     if (f == NULL) {
         printf("Failed to save game!\n");
     }
@@ -861,4 +865,31 @@ bool loadGame(Ship *ships, Projectile *projectiles, int *selectedPlayers, int *t
     *gameState = saveStruct.state;
     fclose(f);
     return true;
+}
+
+void saveSettings() {
+    FILE *f = fopen("settings.cfg", "wb");
+    if (f == NULL) {
+        printf("Failed to save settings!\n");
+        fclose(f);
+        return;
+    }
+    if (fwrite(&settings, sizeof(settings), 1, f)!=1) {
+        printf("Failed to save settings!\n");
+        fclose(f);
+    }
+
+}
+
+void loadSettings() {
+    FILE *f = fopen("settings.cfg", "rb");
+    if (f == NULL) {
+        printf("Failed to load settings!\n");
+        fclose(f);
+        return;
+    }
+    if (fread(&settings, sizeof(settings), 1, f)!=1) {
+        printf("Failed to load settings!\n");
+        fclose(f);
+    }
 }
