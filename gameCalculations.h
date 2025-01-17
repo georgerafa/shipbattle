@@ -2,6 +2,8 @@
 #define GAMECALCULATIONS_H
 #define PROJECTILE_SPEED  200.0f //The initial projectile speed
 #define GRAVITY  45.0f //Gravitational acceleration
+#define maxShipSpeed 75
+#define MAX_PLAYERS 6
 typedef struct ShipStruct {
     int team; //Ship team
     Vector2 position; //Current ship position
@@ -22,6 +24,7 @@ typedef struct ProjectileStruct {
 int getLinePoint(Projectile p, int x);
 void updateShipPositions(Ship *ships, int shipCount, float deltaT);
 void updateProjectiles(Projectile *projectiles, Ship *ships, int projectileCount, float deltaT);
-void initializeProjectiles(Projectile *projectiles, int projectileCount);
+void initializeProjectiles(Projectile *projectiles, Ship ships[], int playerCount);
+void resetProjectiles(Projectile *projectiles, int projectileCount);
 void initializeShips(Ship *ships, int shipCount);
 #endif //GAMECALCULATIONS_H

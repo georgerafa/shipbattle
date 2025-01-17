@@ -3,7 +3,6 @@
 #include "gameCalculations.h"
 
 #include <stdio.h>
-
 #include "raymath.h"
 typedef struct ShipStruct Ship;
 typedef struct ProjectileStruct Projectile;
@@ -60,13 +59,20 @@ void initializeShips(Ship *ships, int shipCount) {
 }
 
 
-void initializeProjectiles(Projectile *projectiles, int projectileCount) { //Initialize the provided projectiles by setting calculating their speed on each axis based on where they are looking
+void resetProjectiles(Projectile *projectiles, int projectileCount) {
     for (int i = 0; i < projectileCount; i++) {
+        projectiles[i].angle = 0;
+        projectiles[i].heading = 0;
+    }
+}
+
+void initializeProjectiles(Projectile *projectiles, Ship ships[], int playerCount) { //Initialize the provided projectiles by setting calculating their speed on each axis based on where they are looking
+    for (int i = 0; i < playerCount; i++) {
         projectiles[i].speed.x = cosf(projectiles[i].heading)*cosf(projectiles[i].angle)*PROJECTILE_SPEED;
         projectiles[i].speed.y = sinf(projectiles[i].heading)*cosf(projectiles[i].angle)*PROJECTILE_SPEED;
         projectiles[i].speed.z = sinf(projectiles[i].angle)*PROJECTILE_SPEED;
+        projectiles[i].position.z = 10-20*(1-ships[i].isAlive);
         projectiles[i].team = i;
-        projectiles[i].angle = 0;
     }
 }
 
