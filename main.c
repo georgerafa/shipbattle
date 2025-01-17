@@ -382,7 +382,7 @@ void main(void){
                         targetLine = getTargetLine(ships, picking,  targetPlayer);
                     }
 
-                    DrawLineV(targetLine.start, targetLine.end, RED);
+                    if (enableTargetLine) DrawLineV(targetLine.start, targetLine.end, RED);
 
                     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                         projectiles[picking].position.x = ships[picking].position.x + ships[picking].distanceMoved.x;
@@ -647,7 +647,6 @@ Line getTargetLine(Ship ships[], int shipA, int shipB) {
         Vector2Add(targetVector, shipOrigin.position),
         Vector2Add(Vector2Negate(targetVector), shipOrigin.position),
     };
-    DrawLineV(checkLine.start, checkLine.end, BLUE);
     Line line  = {(Vector2){-1, -1}, (Vector2){-1, -1}};
     CheckCollisionLines(checkLine.start, checkLine.end, (Vector2){0,0}, GetScreenToWorld2D((Vector2){screenWidth, 0}, camera), &line.start);
     CheckCollisionLines(checkLine.start, checkLine.end, GetScreenToWorld2D((Vector2){screenWidth,0}, camera), GetScreenToWorld2D((Vector2){screenWidth, screenWidth}, camera), line.start.x==-1 ? & line.start : &line.end);
