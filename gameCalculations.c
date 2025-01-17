@@ -3,7 +3,6 @@
 #include "gameCalculations.h"
 
 #include <stdio.h>
-#include "raymath.h"
 typedef struct ShipStruct Ship;
 typedef struct ProjectileStruct Projectile;
 
