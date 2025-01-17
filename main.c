@@ -25,8 +25,9 @@ struct CollisionSection {
 };
 
 //Declare function prototypes
+void checkShipCollisions(Ship *ships);
 int checkProjectileCollision(Ship ship, Projectile projectiles[]);
-int checkCollision(Ship ship, struct CollisionSection[], int sectionCount);
+int checkTerrainCollision(Ship ship, struct CollisionSection[], int sectionCount);
 int playersAlive(Ship ships[]);
 Line getTargetLine(Ship ships[], int shipA, int shipB);
 
@@ -93,7 +94,7 @@ void main(void){
     //Set target fps to monitor refresh rate
     SetTargetFPS(GetMonitorRefreshRate(display));
     SetWindowSize(screenWidth, screenHeight); //Set the game window size to be the same as the screen size
-    //ToggleFullscreen(); //Set window mode to fullscreen
+    ToggleFullscreen(); //Set window mode to fullscreen
 
     //Set camera zoom based on screen size
     camera.zoom = (float)screenWidth/2048.0f;
@@ -320,9 +321,10 @@ void main(void){
                 case MOVEMENT_A: {
                     updateShipPositions(ships, selectedPlayers, GetFrameTime());
                     roundTimer -= GetFrameTime();
+                    checkShipCollisions(ships);
                     for (int i = 0; i < selectedPlayers; i++) {
                         if (ships[i].position.x > mapBounds.x || ships[i].position.y > mapBounds.y) ships[i].isAlive = 0;
-                        ships[i].isAlive = (1 - checkCollision(ships[i], readSections, segmentCount))*ships[i].isAlive;
+                        ships[i].isAlive = (1 - checkTerrainCollision(ships[i], readSections, segmentCount))*ships[i].isAlive;
                     }
                     if (playersAlive(ships) == 0) {
                         currentScreen = END;
@@ -380,9 +382,10 @@ void main(void){
                 case MOVEMENT_B: {
                     updateShipPositions(ships, selectedPlayers, GetFrameTime());
                     roundTimer -=GetFrameTime();
+                    checkShipCollisions(ships);
                     for (int i = 0; i < selectedPlayers; i++) {
                         if (ships[i].position.x > mapBounds.x || ships[i].position.y > mapBounds.y) ships[i].isAlive = 0;
-                        ships[i].isAlive = (1 - checkCollision(ships[i], readSections, segmentCount))*ships[i].isAlive;
+                        ships[i].isAlive = (1 - checkTerrainCollision(ships[i], readSections, segmentCount))*ships[i].isAlive;
                     }
                     if (playersAlive(ships) == 0) {
                         currentScreen = END;
@@ -401,7 +404,6 @@ void main(void){
                     for (int i = 0; i<selectedPlayers; i++) {
                         int aliveState = (1-checkProjectileCollision(ships[i], projectiles))*ships[i].isAlive;
                         ships[i].isAlive = aliveState;
-                        projectiles[i].position.z -= 100*(1-aliveState);
                         if (projectiles[i].position.z>0)  projectilesAlive++;
                     }
                     if (projectilesAlive==0) {
@@ -647,7 +649,60 @@ int playersAlive(Ship ships[]) {
     return playersAlive;
 }
 
-int checkProjectileCollision(Ship ship, Projectile projectiles[]) {
+void checkShipCollisions(Ship *ships) {
+    for (int i = 0; i < selectedPlayers; i++) {
+        for (int j = 0; j < selectedPlayers; j++) {
+            if (i!=j && ships[i].isAlive == 1 && ships[j].isAlive == 1 && Vector2Length(Vector2Subtract(ships[i].position, ships[j].position))<120) {
+                Line shipLinesI[4] = {
+                    {
+                        {(-40*cosf(ships[i].heading)-15*sinf(ships[i].heading)+ships[i].position.x),(-40*sinf(ships[i].heading)+15*cosf(ships[i].heading)+ships[i].position.y)},
+                       {(40*cosf(ships[i].heading)-15*sinf(ships[i].heading)+ships[i].position.x),(40*sinf(ships[i].heading)+15*cosf(ships[i].heading)+ships[i].position.y)}
+                    },
+                    {
+                    {(-40*cosf(ships[i].heading)+15*sinf(ships[i].heading)+ships[i].position.x), (-40*sinf(ships[i].heading)-15*cosf(ships[i].heading)+ships[i].position.y)},
+                    {(40*cosf(ships[i].heading)+15*sinf(ships[i].heading)+ships[i].position.x), (40*sinf(ships[i].heading)-15*cosf(ships[i].heading)+ships[i].position.y)}
+                    },
+                    {
+                    {(-40*cosf(ships[i].heading)-15*sinf(ships[i].heading)+ships[i].position.x), (-40*sinf(ships[i].heading)+15*cosf(ships[i].heading)+ships[i].position.y)},
+                    {(-40*cosf(ships[i].heading)+15*sinf(ships[i].heading)+ships[i].position.x), (-40*sinf(ships[i].heading)-15*cosf(ships[i].heading)+ships[i].position.y)}
+                    },
+                    {
+                    {40*cosf(ships[i].heading)-15*sinf(ships[i].heading)+ships[i].position.x, 40*sinf(ships[i].heading)+15*cosf(ships[i].heading)+ships[i].position.y},
+                    {(40*cosf(ships[i].heading)+15*sinf(ships[i].heading)+ships[i].position.x), (40*sinf(ships[i].heading)-15*cosf(ships[i].heading)+ships[i].position.y)}
+                    }
+                };
+
+                Line shipLinesJ[4] = {
+                    {
+                        {(-40*cosf(ships[j].heading)-15*sinf(ships[j].heading)+ships[j].position.x),(-40*sinf(ships[j].heading)+15*cosf(ships[j].heading)+ships[j].position.y)},
+                       {(40*cosf(ships[j].heading)-15*sinf(ships[j].heading)+ships[j].position.x),(40*sinf(ships[j].heading)+15*cosf(ships[j].heading)+ships[j].position.y)}
+                    },
+                    {
+                        {(-40*cosf(ships[j].heading)+15*sinf(ships[j].heading)+ships[j].position.x), (-40*sinf(ships[j].heading)-15*cosf(ships[j].heading)+ships[j].position.y)},
+                        {(40*cosf(ships[j].heading)+15*sinf(ships[j].heading)+ships[j].position.x), (40*sinf(ships[j].heading)-15*cosf(ships[j].heading)+ships[j].position.y)}
+                    },
+                    {
+                        {(-40*cosf(ships[j].heading)-15*sinf(ships[j].heading)+ships[j].position.x), (-40*sinf(ships[j].heading)+15*cosf(ships[j].heading)+ships[j].position.y)},
+                        {(-40*cosf(ships[j].heading)+15*sinf(ships[j].heading)+ships[j].position.x), (-40*sinf(ships[j].heading)-15*cosf(ships[j].heading)+ships[j].position.y)}
+                    },
+                    {
+                        {40*cosf(ships[j].heading)-15*sinf(ships[j].heading)+ships[j].position.x, 40*sinf(ships[j].heading)+15*cosf(ships[j].heading)+ships[j].position.y},
+                        {(40*cosf(ships[j].heading)+15*sinf(ships[j].heading)+ships[j].position.x), (40*sinf(ships[j].heading)-15*cosf(ships[j].heading)+ships[j].position.y)}
+                    }
+                };
+                for (int k = 0; k < 4; k++) {
+                    for (int l = 0; l < 4; l++) {
+                        if (CheckCollisionLines(shipLinesI[k].start, shipLinesI[k].end, shipLinesJ[l].start, shipLinesJ[l].end, NULL)) {
+                            ships[i].isAlive = 0;
+                            ships[j].isAlive = 0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+int checkProjectileCollision(Ship ship, Projectile *projectiles) {
     Vector2 shipPos = ship.position;//Position of the provided ship
     if (ship.isAlive==0) return 0;
     Line shipLines[4] = { //The line segments that make up the hitbox of the ship
@@ -672,6 +727,7 @@ int checkProjectileCollision(Ship ship, Projectile projectiles[]) {
         Projectile projectile = projectiles[i];
         for (int j = 0; j < 4; j++) {
             if (CheckCollisionCircleLine((Vector2){projectile.position.x, projectile.position.y}, 15, shipLines[i].start, shipLines[i].end)&&projectile.position.z<15&&projectile.position.z>0&&projectile.team!=ship.team) {
+                projectiles[i].position.z = -10;
                 return 1;
             }
         }
@@ -679,7 +735,7 @@ int checkProjectileCollision(Ship ship, Projectile projectiles[]) {
     return 0;
 }
 
-int checkCollision(Ship ship, struct CollisionSection sections[], int sectionCount){//Checks if the provided ship is colliding with any obstacle. Returns 1 if it detects collision and 0 if it doesn't
+int checkTerrainCollision(Ship ship, struct CollisionSection sections[], int sectionCount){//Checks if the provided ship is colliding with any obstacle. Returns 1 if it detects collision and 0 if it doesn't
     Vector2 shipPos = ship.position;//Position of the provided ship
     Line shipLines[4] = { //The line segments that make up the hitbox of the ship
         {
