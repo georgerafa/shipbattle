@@ -180,9 +180,10 @@ void main(void){
                         break;
                     case 1://Load game
                         PlaySound(confirmSound);
-                        loadGame(ships, projectiles, &selectedPlayers, &targetPlayer, &picking, &roundTimer, &currentState);
-                        isMidGame = true;
-                        currentScreen = GAME;
+                        if (loadGame(ships, projectiles, &selectedPlayers, &targetPlayer, &picking, &roundTimer, &currentState)) {
+                            isMidGame = true;
+                            currentScreen = GAME;
+                        }
                         break;
                     case 2://Settings
                         PlaySound(confirmSound);
@@ -335,6 +336,7 @@ void main(void){
                     }
                     if (playersAlive(ships) == 0) {
                         currentScreen = END;
+                        isMidGame = false;
                         StopMusicStream(gameMusic);
                         PlayMusicStream(backgroundMusic);
                     }
@@ -345,6 +347,7 @@ void main(void){
                     }
                     else if (roundTimer <= 0){
                         currentScreen = END;
+                        isMidGame = false;
                         StopMusicStream(gameMusic);
                         PlayMusicStream(backgroundMusic);
                     }
@@ -396,6 +399,7 @@ void main(void){
                     }
                     if (playersAlive(ships) == 0) {
                         currentScreen = END;
+                        isMidGame = false;
                         StopMusicStream(gameMusic); // Start game music
                         PlayMusicStream(backgroundMusic); // Stop menu music
                     }
