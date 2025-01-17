@@ -357,6 +357,7 @@ void main(void){
                     selectAnimation = fmod(selectAnimation + GetFrameTime()*M_PI, M_PI*2);
                     Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), camera);
                     while (ships[picking].isAlive == 0) picking++;
+                    while (ships[targetPlayer].isAlive == 0 || targetPlayer == picking) targetPlayer = (targetPlayer + 1) % selectedPlayers;
                     if (picking >= selectedPlayers) {
                         currentState = MOVEMENT_B;
                         picking = 0;
