@@ -1,13 +1,14 @@
 #include <math.h>
 #include "raylib.h"
+#include <stddef.h>
+
 #include "gameCalculations.h"
 
-#include <stdio.h>
 typedef struct ShipStruct Ship;
 typedef struct ProjectileStruct Projectile;
 
-#define MAX_PLAYERS 6
-struct SpawnPosition {
+//The 6 spawn positions on the map
+struct {
     Vector2 position;
     float heading;
 } spawnPositions[6] = {
@@ -32,7 +33,7 @@ struct SpawnPosition {
     }
 };
 
-
+//Calculate the height of the projectile for the provided x value
 int getLinePoint(Projectile p, int x) {
     float t = x/(PROJECTILE_SPEED*cosf(p.angle));
     return (int)(10 + sinf(p.angle)*PROJECTILE_SPEED*t - 0.5*GRAVITY*t*t);
@@ -57,7 +58,7 @@ void initializeShips(Ship *ships, int shipCount) {
     }
 }
 
-
+//Reset projectile angle and heading back to 0
 void resetProjectiles(Projectile *projectiles, int projectileCount) {
     for (int i = 0; i < projectileCount; i++) {
         projectiles[i].angle = 0;
@@ -65,6 +66,7 @@ void resetProjectiles(Projectile *projectiles, int projectileCount) {
     }
 }
 
+//Initialize all projectiles by setting their speed based on heading and angle and also set their z position to 10 if their origin ship is alive and -10 if their origin ship is dead
 void initializeProjectiles(Projectile *projectiles, Ship ships[], int playerCount) { //Initialize the provided projectiles by setting calculating their speed on each axis based on where they are looking
     for (int i = 0; i < playerCount; i++) {
         projectiles[i].speed.x = cosf(projectiles[i].heading)*cosf(projectiles[i].angle)*PROJECTILE_SPEED;
@@ -86,7 +88,8 @@ void updateProjectiles(Projectile *projectiles, Ship *ships, int projectileCount
     }
 }
 
-int checkTerrainCollision(Ship ship, struct CollisionSection sections[], int sectionCount){//Checks if the provided ship is colliding with any obstacle. Returns 1 if it detects collision and 0 if it doesn't
+//Checks if the provided ship is colliding with any terrain. Returns 1 if it detects collision and 0 if it doesn't
+int checkTerrainCollision(Ship ship, struct CollisionSection sections[], int sectionCount){
     Vector2 shipPos = ship.position;//Position of the provided ship
     Line shipLines[4] = { //The line segments that make up the hitbox of the ship
         {
@@ -133,6 +136,7 @@ int checkTerrainCollision(Ship ship, struct CollisionSection sections[], int sec
     return 0; //Return 0 if no collision is detected
 }
 
+//Check if the provided ship has been hit by any projectiles
 int checkProjectileCollision(Ship ship, Projectile *projectiles, int playerCount) {
     Vector2 shipPos = ship.position;//Position of the provided ship
     if (ship.isAlive==0) return 0;
@@ -142,23 +146,25 @@ int checkProjectileCollision(Ship ship, Projectile *projectiles, int playerCount
            {40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x,40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y}
         },
         {
-                            {-40*cosf(ship.heading)-7*sinf(ship.heading)+shipPos.x,-40*sinf(ship.heading)+7*cosf(ship.heading)+shipPos.y},
-                            {40*cosf(ship.heading)-7*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)+7*cosf(ship.heading)+shipPos.y}
+            {-40*cosf(ship.heading)-7*sinf(ship.heading)+shipPos.x,-40*sinf(ship.heading)+7*cosf(ship.heading)+shipPos.y},
+            {40*cosf(ship.heading)-7*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)+7*cosf(ship.heading)+shipPos.y}
         },
         {
-                            {-40*cosf(ship.heading)+7*sinf(ship.heading)+shipPos.x, -40*sinf(ship.heading)-7*cosf(ship.heading)+shipPos.y},
-                            {40*cosf(ship.heading)+7*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)-7*cosf(ship.heading)+shipPos.y}
+            {-40*cosf(ship.heading)+7*sinf(ship.heading)+shipPos.x, -40*sinf(ship.heading)-7*cosf(ship.heading)+shipPos.y},
+            {40*cosf(ship.heading)+7*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)-7*cosf(ship.heading)+shipPos.y}
         },
         {
-                            {-40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x, -40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y},
-                            {40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y}
+            {-40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x, -40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y},
+            {40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y}
         }
     };
     for (int i = 0; i < playerCount; i++) {
-        Projectile projectile = projectiles[i];
+        Projectile projectile = projectiles[i]; //Current projectile
         for (int j = 0; j < 4; j++) {
+            //Check for collision
+            //The projectile can only hit a ship if it is at a height of 15 or below
             if (CheckCollisionCircleLine((Vector2){projectile.position.x, projectile.position.y}, 15, shipLines[i].start, shipLines[i].end)&&projectile.position.z<15&&projectile.position.z>0&&projectile.team!=ship.team) {
-                projectiles[i].position.z = -10;
+                projectiles[i].position.z = -10;//If a ship has been hit set its height to -10
                 return 1;
             }
         }
@@ -166,7 +172,7 @@ int checkProjectileCollision(Ship ship, Projectile *projectiles, int playerCount
     return 0;
 }
 
-
+//Return the number of ships that are still alive
 int playersAlive(Ship ships[], int playerCount) {
     int playersAlive = 0;
     for (int i = 0; i < playerCount; i++) {
@@ -175,11 +181,13 @@ int playersAlive(Ship ships[], int playerCount) {
     return playersAlive;
 }
 
+//Checks for ship-ship collisions
 void checkShipCollisions(Ship *ships, int playerCount) {
+    //Iterate through all ships
     for (int i = 0; i < playerCount; i++) {
         for (int j = 0; j < playerCount; j++) {
             if (i!=j && ships[i].isAlive == 1 && ships[j].isAlive == 1 && Vector2Length(Vector2Subtract(ships[i].position, ships[j].position))<120) {
-                Line shipLinesI[4] = {
+                Line shipLinesI[4] = {//Line segments making up the hitbox of the ship with index i
                     {
                         {(-40*cosf(ships[i].heading)-15*sinf(ships[i].heading)+ships[i].position.x),(-40*sinf(ships[i].heading)+15*cosf(ships[i].heading)+ships[i].position.y)},
                        {(40*cosf(ships[i].heading)-15*sinf(ships[i].heading)+ships[i].position.x),(40*sinf(ships[i].heading)+15*cosf(ships[i].heading)+ships[i].position.y)}
@@ -198,7 +206,7 @@ void checkShipCollisions(Ship *ships, int playerCount) {
                     }
                 };
 
-                Line shipLinesJ[4] = {
+                Line shipLinesJ[4] = {//Line segments making up the hitbox of the ship with index j
                     {
                         {(-40*cosf(ships[j].heading)-15*sinf(ships[j].heading)+ships[j].position.x),(-40*sinf(ships[j].heading)+15*cosf(ships[j].heading)+ships[j].position.y)},
                        {(40*cosf(ships[j].heading)-15*sinf(ships[j].heading)+ships[j].position.x),(40*sinf(ships[j].heading)+15*cosf(ships[j].heading)+ships[j].position.y)}

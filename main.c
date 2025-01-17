@@ -1,22 +1,25 @@
 #include "raylib.h"
 #include <math.h>
 #include <stdio.h>
-#include "gameCalculations.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
-float countdownTimer = 3.0f; // Countdown timer for 3-2-1-Go
-float roundTimer = 10.0f;
+#include "gameCalculations.h"
 
-struct {
+float countdownTimer = 3.0f; // Countdown timer for 3-2-1-Go
+float roundTimer = 10.0f; //Timer for round length
+
+struct { //Settings are stored in this struct for easy saving
     bool enableTargetLine;
     float musicVolume;
     float soundVolume;
 } settings = {true, 0.5f, 0.5f};
+
+//isMidGame is true when a game is currently ongoing
 bool isMidGame = false;
 
-typedef enum GameState {DIRECTION_INSTR, MOVEMENT_A, FIRE_INSTR, MOVEMENT_B, FIRE} GameState;
+typedef enum GameState {DIRECTION_INSTR, MOVEMENT_A, FIRE_INSTR, MOVEMENT_B, FIRE} GameState; //All game states
 typedef enum GameScreen {TITLE, PLAYER_SELECT, COUNTDOWN, GAME, SETTINGS, HOW_TO_PLAY, END} GameScreen; //All screen states
 
 
@@ -29,7 +32,7 @@ void saveSettings();
 void loadSettings();
 
 
-// Sound variables
+//Sound variables
 Music backgroundMusic;
 Music gameMusic;
 Sound selectionSound;
@@ -42,9 +45,11 @@ Texture2D backgroundTexture;
 Texture2D cannonBallTexture;
 Texture2D endTexture;
 
-GameScreen currentScreen = TITLE; //Initial screen state
+//Initial states
+GameScreen currentScreen = TITLE;
 GameState currentState = DIRECTION_INSTR;
 
+//Previous and next screen states
 GameScreen previousScreen = TITLE;
 GameScreen nextScreen = PLAYER_SELECT;
 
@@ -53,33 +58,44 @@ int picking = 0; //The player currently picking movement or firing instructions
 
 int screenWidth;
 int screenHeight;
-
 Camera2D camera = {0}; //Initialize 2D top down camera
+
+void endGame(){
+    currentScreen = END;
+    remove("save.dat");
+    isMidGame = false;
+    StopMusicStream(gameMusic);
+    PlayMusicStream(backgroundMusic);
+}
 
 void main(void){
     //Open collisions.dat file in read binary mode
     FILE *f = fopen("collisions.dat", "rb");
-    //Check if file was opened
+    //Check if file was opened correctly
     if (f == NULL) {
-        perror("collisions.dat file is missing");
+        perror("collisions.dat file is missing!");
         return;
     }
     //Measure file length
     fseek(f, 0, SEEK_END);
     int length = ftell(f);
-    //Check if file has contentes
+    rewind(f);
+    //Check if file has contents
     if (length <= 0) {
-        perror("collisions.dat file is corrupted");
+        perror("collisions.dat file is corrupted!");
         return;
     }
+    //Calculate the number of collision segments stored in the file
     int segmentCount = length/sizeof(struct CollisionSection);
     //Create variable to store the read collision sections from the file
     struct CollisionSection readSections[segmentCount];
-    rewind(f);
     //Get the data from the file and close it
     fread(&readSections, sizeof(readSections), 1, f);
     fclose(f);
+
+    //Load saved settings
     loadSettings();
+
     InitWindow(800, 800, "POLYNAYMAXIA"); //Initialize the game window
     SetExitKey(0); //Remove exit key
 
@@ -87,32 +103,31 @@ void main(void){
     screenWidth = GetMonitorWidth(display); //Get screen width
     screenHeight = GetMonitorHeight(display); //Get screen height
 
-    //Set target fps to monitor refresh rate
-    SetTargetFPS(GetMonitorRefreshRate(display));
+
+    SetTargetFPS(GetMonitorRefreshRate(display)); //Set target fps to monitor refresh rate
     SetWindowSize(screenWidth, screenHeight); //Set the game window size to be the same as the screen size
     ToggleFullscreen(); //Set window mode to fullscreen
-    //Set camera zoom based on screen size
-    camera.zoom = (float)screenWidth/2048.0f;
-    const Vector2 mapBounds = GetScreenToWorld2D((Vector2){screenWidth, screenHeight}, camera);
 
+    camera.zoom = (float)screenWidth/2048.0f;//Set camera zoom based on screen size
+
+    //Calculate map edges
+    const Vector2 mapBounds = GetScreenToWorld2D((Vector2){screenWidth, screenHeight}, camera);
 
     // Initialize audio
     InitAudioDevice();
 
-    //Load main menu music
+    //Load music
     backgroundMusic = LoadMusicStream("assets/background_music.mp3");
-    //Load in-game music
     gameMusic = LoadMusicStream("assets/game_music.mp3");
-    //Load selection sound effect
+    //Load sound effects
     selectionSound = LoadSound("assets/selection.wav");
-    //Load confirm selection sound effect
     confirmSound = LoadSound("assets/confirm.wav");
 
-    //Set volume
+    //Set volume for audio streams
     SetMusicVolume(gameMusic,settings.musicVolume);
+    SetMusicVolume(backgroundMusic, settings.musicVolume);
     SetSoundVolume(selectionSound, settings.soundVolume);
     SetSoundVolume(confirmSound, settings.soundVolume);
-    SetMusicVolume(backgroundMusic, settings.musicVolume);
 
     //Start playing main menu music
     PlayMusicStream(backgroundMusic);
@@ -141,21 +156,29 @@ void main(void){
     Ship ships[MAX_PLAYERS]; //Create array for storing ships
     Projectile projectiles[MAX_PLAYERS]; //Create array for storing projectiles
 
-    //Counter variable for showing selected ship
+    //Counter variable for selected ship animation
     double selectAnimation = 0;
+    //The player that is currently being targeted for calculating the line on which the two ships will end up
     int targetPlayer = 1;
+    //shouldExit is set to true if the program needs to exit
     bool shouldExit = 0;
-    while (!(WindowShouldClose()||shouldExit)){ //While the window open
+
+
+    while (!(WindowShouldClose()||shouldExit)){ //While the game is running
+        //Update the streaming buffers
         UpdateMusicStream(backgroundMusic);
         UpdateMusicStream(gameMusic);
-        switch (currentScreen){//Change what is displayed based on current screen state
-        case TITLE: //Startup screen
-            static int selectedOption = 0;
-            if (IsKeyPressed(KEY_UP)) {
+
+        switch (currentScreen) {
+            //Change what is displayed based on current screen state
+            case TITLE: //Main menu
+                static int selectedOption = 0; //Currently selected option
+            //Handle key presses
+            if (IsKeyPressed(KEY_UP)) { //Navigate up
                 PlaySound(selectionSound);
                 selectedOption = (selectedOption - 1 + 4) % 4;
             }
-            if (IsKeyPressed(KEY_DOWN)) {
+            if (IsKeyPressed(KEY_DOWN)) { //Navigate down
                 PlaySound(selectionSound);
                 selectedOption = (selectedOption + 5) % 4;
             }
@@ -168,24 +191,24 @@ void main(void){
                 switch (selectedOption) {
                     case 0://New game
                         PlaySound(confirmSound);
-                        currentScreen = PLAYER_SELECT;
-                        break;
+                    currentScreen = PLAYER_SELECT;
+                    break;
                     case 1://Load game
                         PlaySound(confirmSound);
-                        if (loadGame(ships, projectiles, &selectedPlayers, &targetPlayer, &picking, &roundTimer, &currentState)) {
-                            isMidGame = true;
-                            currentScreen = GAME;
-                        }
-                        break;
+                    if (loadGame(ships, projectiles, &selectedPlayers, &targetPlayer, &picking, &roundTimer, &currentState)) {
+                        isMidGame = true;
+                        currentScreen = GAME;
+                    }
+                    break;
                     case 2://Settings
                         PlaySound(confirmSound);
-                        previousScreen = TITLE;
-                        currentScreen = SETTINGS;
-                        selectedOption = 0;
-                        break;
+                    previousScreen = TITLE;
+                    currentScreen = SETTINGS;
+                    selectedOption = 0;
+                    break;
                     case 3://Quit
                         shouldExit = true;
-                        break;
+                    break;
                 }
             }
 
@@ -193,13 +216,13 @@ void main(void){
             ClearBackground(RAYWHITE); //Clear the background
             DrawTexturePro( //Draw the background texture
                 backgroundTexture,
-                (Rectangle){0, 0, (float)backgroundTexture.width, (float)backgroundTexture.height},
-                (Rectangle){0, 0, (float)screenWidth, (float)screenHeight},
-                (Vector2){0, 0},
-                0.0f,
-                WHITE);
+                (Rectangle){0, 0, (float)backgroundTexture.width, (float)backgroundTexture.height}, //Area of texture to use
+                (Rectangle){0, 0, (float)screenWidth, (float)screenHeight}, //Area to put that part of the texture on
+                (Vector2){0, 0}, //Rotation origin
+                0.0f, //Rotation
+                WHITE); //Tint
 
-            //Write some text on the screen
+            //Write text on the screen
             DrawText("Welcome to Mononaumaxia!", 100, 150, 50, WHITE);
             DrawText(TextFormat("New Game"), 100, 250, 30, selectedOption == 0 ? WHITE : BLACK);
             DrawText(TextFormat("Resume game"), 100, 300, 30, selectedOption == 1 ? WHITE : BLACK);
@@ -208,9 +231,10 @@ void main(void){
 
             EndDrawing();//Stop drawing screen
             break;
-        case PLAYER_SELECT: // Player selection screen
-            const int totalOptions = MAX_PLAYERS + 1;
-            if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) {
+            case PLAYER_SELECT: // Player selection
+                const int totalOptions = MAX_PLAYERS + 1; //Total available options
+            //Handle key presses
+            if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) { //Navigate through available options
                 PlaySound(selectionSound);
                 if (IsKeyPressed(KEY_UP) && selectedPlayers > 2) {
                     selectedPlayers--;
@@ -219,10 +243,12 @@ void main(void){
                 }
             }
 
-            if (IsKeyPressed(KEY_ENTER)) {
+            if (IsKeyPressed(KEY_ENTER)) { //Confirm choice
                 PlaySound(confirmSound);
                 if (selectedPlayers <= MAX_PLAYERS) {
+                    //Set which screen to go to next
                     currentScreen = COUNTDOWN;
+                    //Change which music is playing
                     PlayMusicStream(gameMusic);
                     StopMusicStream(backgroundMusic);
                     //Reset all game variables
@@ -230,13 +256,14 @@ void main(void){
                     countdownTimer = 3;
                     roundTimer = 10.0f;
                     targetPlayer = 1;
+                    //Set the next game state
                     currentState = DIRECTION_INSTR;
-                } else if (selectedPlayers == totalOptions) {
+                } else if (selectedPlayers == totalOptions) { //If last option is selected go to the main menu
                     currentScreen = TITLE;
                 }
             }
 
-            if (IsKeyPressed(KEY_ESCAPE)){
+            if (IsKeyPressed(KEY_ESCAPE)){ //Go to settings menu
                 PlaySound(confirmSound);
                 previousScreen = PLAYER_SELECT;
                 currentScreen = SETTINGS;
@@ -258,6 +285,7 @@ void main(void){
             DrawText("Press UP/DOWN arrows to choose", 100, 160, 30, WHITE);
             DrawText("Press ENTER to select", 100, 200, 30, WHITE);
 
+            //Draw options
             for (int i = 2; i <= MAX_PLAYERS; i++) {
                 const char *text = TextFormat("%s%d Players", i == selectedPlayers ? "> " : "", i);
                 DrawText(text,300-MeasureText(text, 40), 250 + (i - 1) * 40, 40, i==selectedPlayers ? GREEN : WHITE);
@@ -272,98 +300,94 @@ void main(void){
             break;
 
 
-        case COUNTDOWN: // Countdown screen
-            countdownTimer -= GetFrameTime()*1.1f;
-            if (countdownTimer <= -1) {
+            case COUNTDOWN: // Countdown screen
+                countdownTimer -= GetFrameTime()*1.1f; //decrement countdown timer
+            if (countdownTimer <= -1) { //When the timer reaches -1 start the game
                 isMidGame = true;
                 currentScreen = GAME; // Transition to game screen
-                initializeShips(ships, selectedPlayers);
+                initializeShips(ships, selectedPlayers); //Initialize all ships
             }
+
             BeginDrawing();
             ClearBackground(BLACK);
-            if (countdownTimer <= 0) {
+
+            if (countdownTimer <= 0) { //Draw 3-2-1 until counter reaches 0 then draw "GO!"
                 DrawText("GO!", screenWidth / 2 - 50, screenHeight /2 -25 , 100, GREEN);
             }else {
                 DrawText(TextFormat("%.0f", countdownTimer > 0 ? ceilf(countdownTimer) : 0), screenWidth / 2 - 50, screenHeight / 2 -25 , 100, WHITE);
             }
             EndDrawing();
             break;
-        case GAME:
-            // Handle pause and switch to settings menu
-            if (IsKeyPressed(KEY_ESCAPE)) {
-                PlaySound(confirmSound);
-                previousScreen = GAME;
-                currentScreen = SETTINGS;
-            }
+            case GAME:
+                if (IsKeyPressed(KEY_ESCAPE)) { //Go to settings menu
+                    PlaySound(confirmSound);
+                    previousScreen = GAME;
+                    currentScreen = SETTINGS;
+                }
 
             BeginDrawing();
             ClearBackground(DARKBLUE);
 
-            BeginMode2D(camera);
-            DrawTexture(gameMapTexture, 0, 0, WHITE);
+            BeginMode2D(camera); //Begin rendering in the 2D camera mode
+            DrawTexture(gameMapTexture, 0, 0, WHITE); //Draw game map
 
-            switch (currentState) {
-                case DIRECTION_INSTR: {
-                    selectAnimation = fmod(selectAnimation + GetFrameTime()*M_PI, M_PI*2);
-                    Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), camera);
-                    while (ships[picking].isAlive == 0) picking ++;
-                    ships[picking].heading = atan2f(mousePos.y-ships[picking].position.y, mousePos.x-ships[picking].position.x);
-                    if (picking >= selectedPlayers) {
+            switch (currentState) {//Current game state
+                case DIRECTION_INSTR: { //Giving direction and speed instructions
+                    selectAnimation = fmod(selectAnimation + GetFrameTime()*M_PI, M_PI*2); //Increase selectAnimation counter until 2*Pi is reached then reset
+                    Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), camera); //Get the mouse position on the game map as the camera sees it
+                    while (ships[picking].isAlive == 0) picking ++; //Make sure the ship currently selected is alive
+                    ships[picking].heading = atan2f(mousePos.y-ships[picking].position.y, mousePos.x-ships[picking].position.x); //Set ship heading to where the mouse points
+                    if (picking >= selectedPlayers) { //If all ships have given their instructions start movement
                         currentState = MOVEMENT_A;
                         picking = 0;
                     }
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { //Confirm choice
+                        //Set ship speed based on cursor distance from center of ship
                         ships[picking].speed = fminf(Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ships[picking].position)), maxShipSpeed*2)/2;
                         picking ++;
                     }
                     break;
                 }
-                case MOVEMENT_A: {
-                    updateShipPositions(ships, selectedPlayers, GetFrameTime());
-                    roundTimer -= GetFrameTime();
-                    checkShipCollisions(ships, selectedPlayers);
+                case MOVEMENT_A: {//First half of movement phase
+                    updateShipPositions(ships, selectedPlayers, GetFrameTime()); //Update the ship positions
+                    roundTimer -= GetFrameTime(); //Decrement the round timer
+                    checkShipCollisions(ships, selectedPlayers); //Check for ship-ship collisions
                     for (int i = 0; i < selectedPlayers; i++) {
-                        if (ships[i].position.x > mapBounds.x || ships[i].position.y > mapBounds.y) ships[i].isAlive = 0;
-                        ships[i].isAlive = (1 - checkTerrainCollision(ships[i], readSections, segmentCount))*ships[i].isAlive;
+                        if (ships[i].position.x > mapBounds.x || ships[i].position.y > mapBounds.y) ships[i].isAlive = 0; //Kill any ships that are outside the map
+                        ships[i].isAlive = (1 - checkTerrainCollision(ships[i], readSections, segmentCount))*ships[i].isAlive; //Check for ship-terrain collisions
                     }
-                    if (playersAlive(ships, selectedPlayers) == 0) {
-                        currentScreen = END;
-                        remove("save.dat");
-                        isMidGame = false;
-                        StopMusicStream(gameMusic);
-                        PlayMusicStream(backgroundMusic);
+                    if (playersAlive(ships, selectedPlayers) == 0) { //If no players are alive end the game
+                        endGame();
                     }
-                    if (roundTimer <= 5 && playersAlive(ships, selectedPlayers) > 1) {
+                    if (roundTimer <= 5 && playersAlive(ships, selectedPlayers) > 1) { //If the round timer has passed the halfway point and there are more than 1 ships alive move on to firing instructions
                         currentState = FIRE_INSTR;
                         resetProjectiles(projectiles, selectedPlayers);
-                        GetMouseWheelMove();
                     }
-                    else if (roundTimer <= 0){
-                        currentScreen = END;
-                        remove("save.dat");
-                        isMidGame = false;
-                        StopMusicStream(gameMusic);
-                        PlayMusicStream(backgroundMusic);
+                    else if (roundTimer <= 0){ //Otherwise if the round timer has ended end the game
+                        endGame();
                     }
                     break;
                 }
-                case FIRE_INSTR: {
+                case FIRE_INSTR: { //Give shooting instructions
                     selectAnimation = fmod(selectAnimation + GetFrameTime()*M_PI, M_PI*2);
                     Vector2 mousePos = GetScreenToWorld2D(GetMousePosition(), camera);
                     while (ships[picking].isAlive == 0) picking++;
+                    //Select a target that is alive and is not the ship currently picking
                     while (ships[targetPlayer].isAlive == 0 || targetPlayer == picking) targetPlayer = (targetPlayer + 1) % selectedPlayers;
-                    if (picking >= selectedPlayers) {
+                    if (picking >= selectedPlayers) { //After all ship shave picked move on to the second part of the movement phase
                         currentState = MOVEMENT_B;
                         picking = 0;
                         break;
                     }
 
+                    //Set the heading of the projectile to where the mouse is pointing
                     projectiles[picking].heading = atan2f(mousePos.y-ships[picking].position.y, mousePos.x-ships[picking].position.x);
+                    //Set the angle of the projectile based on the scroll wheel movement
                     projectiles[picking].angle = fmaxf(fminf(GetMouseWheelMove()*0.01f+projectiles[picking].angle, M_PI/2), 0);
 
-                    Line targetLine;
+                    Line targetLine; //Initialize the target line variable
 
-                    if (playersAlive(ships, selectedPlayers) > 1) {
+                    if (playersAlive(ships, selectedPlayers) > 1) { //If there are more than 1 ships alive change current target
                         if (IsKeyPressed(KEY_DOWN)) {
                             if (--targetPlayer<0) targetPlayer = selectedPlayers-1;
                             while (ships[targetPlayer].isAlive == 0 || picking == targetPlayer) --targetPlayer < 0 ? targetPlayer = selectedPlayers-1 : targetPlayer;
@@ -372,19 +396,21 @@ void main(void){
                             if (++targetPlayer>=selectedPlayers) targetPlayer = 0;
                             while (ships[targetPlayer].isAlive == 0 || picking == targetPlayer) ++targetPlayer >= selectedPlayers ? targetPlayer = 0 : targetPlayer;
                         }
+                        //Calculate the line on which both the picking and target ship will end up on
                         targetLine = getTargetLine(ships, picking,  targetPlayer);
                     }
-
+                    //If the target line is enabled, display it
                     if (settings.enableTargetLine) DrawLineV(targetLine.start, targetLine.end, RED);
 
-                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {//Confirm choice
                         projectiles[picking].position.x = ships[picking].position.x + ships[picking].distanceMoved.x;
                         projectiles[picking].position.y = ships[picking].position.y + ships[picking].distanceMoved.y;
                         targetPlayer = (++picking + 1) % selectedPlayers;
                     }
                     break;
                 }
-                case MOVEMENT_B: {
+                case MOVEMENT_B: { //Second half of movement phase
+                    //Mostly same as MOVEMENT_A
                     updateShipPositions(ships, selectedPlayers, GetFrameTime());
                     roundTimer -=GetFrameTime();
                     checkShipCollisions(ships, selectedPlayers);
@@ -393,132 +419,128 @@ void main(void){
                         ships[i].isAlive = (1 - checkTerrainCollision(ships[i], readSections, segmentCount))*ships[i].isAlive;
                     }
                     if (playersAlive(ships, selectedPlayers) == 0) {
-                        currentScreen = END;
-                        isMidGame = false;
-                        remove("save.dat");
-                        StopMusicStream(gameMusic); // Start game music
-                        PlayMusicStream(backgroundMusic); // Stop menu music
+                        endGame();
                     }
-                    if (roundTimer <= 0) {
+                    if (roundTimer <= 0) { //If round timer ends go to shooting phase
                         currentState = FIRE;
-                        initializeProjectiles(projectiles, ships, selectedPlayers);
+                        initializeProjectiles(projectiles, ships, selectedPlayers); //Initialize all projectiles
                     }
                     break;
                 }
-                case FIRE: {
-                    updateProjectiles(projectiles, ships, selectedPlayers, GetFrameTime());
+                case FIRE: { //Shooting phase
+                    updateProjectiles(projectiles, ships, selectedPlayers, GetFrameTime()); //Update projectile positions
+                    //Calculate the number of projectiles still flying
                     int projectilesAlive = 0;
                     for (int i = 0; i<selectedPlayers; i++) {
-                        int aliveState = (1-checkProjectileCollision(ships[i], projectiles, selectedPlayers))*ships[i].isAlive;
+                        int aliveState = (1-checkProjectileCollision(ships[i], projectiles, selectedPlayers))*ships[i].isAlive; //Check for projectile-ship collisions
                         ships[i].isAlive = aliveState;
+                        //Projectiles are considered to be flying if their position on the z-axis is above 0
                         if (projectiles[i].position.z>0)  projectilesAlive++;
                     }
-                    if (projectilesAlive==0) {
-                        resetProjectiles(projectiles, selectedPlayers);
-                        if (playersAlive(ships, selectedPlayers) <= 1) {
-                            isMidGame = false;
-                            currentScreen = END;
-                            remove("save.dat");
-                            StopMusicStream(gameMusic); // Start game music
-                            PlayMusicStream(backgroundMusic); // Stop menu music
+                    if (projectilesAlive==0) { //If no projectiles are alive
+                        resetProjectiles(projectiles, selectedPlayers);//Reset the projectiles
+                        if (playersAlive(ships, selectedPlayers) <= 1) { //End the game if there aren't more than 1 players alive
+                            endGame();
                         }
-                        else {
+                        else { //If there are more than 1 players start a new round
+                            //Reset game variables
                             currentState = DIRECTION_INSTR;
                             roundTimer = 10.0f;
                             picking = 0;
                             targetPlayer = 1;
                             for (int i = 0 ; i<selectedPlayers; i++) {
-                                ships[i].distanceMoved = (Vector2){0};
+                                ships[i].distanceMoved = (Vector2){0}; //Reset the logged distance moved by the ships
                             }
                         }
                     }
                 }
             }
-            for (int i = 0; i < selectedPlayers; i++) {
-                Ship ship = ships[i];
-                if (ship.isAlive) {
-                    Vector2 lineStart = ship.position;
-                    if (i==picking && (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)) {
-                        float arrowLength = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ship.position));
-                        arrowLength = currentState == FIRE_INSTR ? 200*(M_PI/2 - projectiles[i].angle)/(M_PI/2) : fminf(arrowLength, maxShipSpeed*2); //HERE
+            for (int i = 0; i < selectedPlayers; i++) { //Draw ships
+                Ship ship = ships[i]; //Current ship
+                if (ship.isAlive) {//If the ship is alive
+                    Vector2 lineStart = ship.position; //Store ship position
+                    if (i==picking && (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)) { //If current ship is the one picking during the direction or shooting instructions
+                        float arrowLength = Vector2Length(Vector2Subtract(GetScreenToWorld2D(GetMousePosition(), camera), ship.position)); //Calculate the visualizer arrow length
+                        //During the shooting instructions phase calculate arrow length based on projectile angle
+                        arrowLength = currentState == FIRE_INSTR ? 200*(M_PI/2 - projectiles[i].angle)/(M_PI/2) : fminf(arrowLength, maxShipSpeed*2);
+                        //Draw the arrow
                         DrawRectanglePro((Rectangle){ship.position.x, ship.position.y, 10, arrowLength}, (Vector2){5,0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading) * RAD2DEG + 270, WHITE);
                         DrawTriangle(Vector2Add(lineStart, Vector2Rotate((Vector2){arrowLength, -10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){arrowLength, 10}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), Vector2Add(lineStart, Vector2Rotate((Vector2){arrowLength+40, 0}, (currentState==DIRECTION_INSTR?ship.heading:projectiles[i].heading))), WHITE);
                     }
+                    //Draw ship texture
                     DrawTexturePro(
                         shipTexture,
                         (Rectangle){0, 0, (float)shipTexture.width, (float)shipTexture.height},
                         (Rectangle){ship.position.x, ship.position.y, 100, 100},
                         (Vector2){50, 50},
                         ship.heading * RAD2DEG + 270,
+                        //Change the color of the ship if it is selected
                         (Color){255, i==targetPlayer&&currentState==FIRE_INSTR? 128 : 255, i==targetPlayer&&currentState==FIRE_INSTR? 128 : 255, (currentState==DIRECTION_INSTR||currentState==FIRE_INSTR)&&i==picking?205-50*cos(selectAnimation) : 255});
                 }
             }
-            for (int i = 0 ; i<selectedPlayers; i++) {
-                if (currentState == FIRE&&projectiles[i].position.z>0) DrawTexturePro(cannonBallTexture, (Rectangle){0,0, cannonBallTexture.width, cannonBallTexture.height}, (Rectangle){projectiles[i].position.x, projectiles[i].position.y, 10+0.1f*projectiles[i].position.z, 10+0.1f*projectiles[i].position.z,},(Vector2){(10+0.1f*projectiles[i].position.z)/2, (10+0.1f*projectiles[i].position.z)/2}, 0, WHITE);
-                if (currentState == FIRE_INSTR) {
-                    float initialZspeed = PROJECTILE_SPEED*sinf(projectiles[picking].angle); //HERE
-                    float maxDistance = PROJECTILE_SPEED*cosf(projectiles[picking].angle)*((initialZspeed+sqrtf(20*GRAVITY+initialZspeed*initialZspeed))/GRAVITY); //HERE
+            //Draw projectile related objects only during shooting instructions or during shooting phase
+            if (currentState == FIRE_INSTR || currentState == FIRE) {
+                for (int i = 0 ; i<selectedPlayers; i++) {
+                    if (currentState == FIRE&&projectiles[i].position.z>0) //During firing phase draw any flying projectiles
+                        DrawTexturePro(
+                            cannonBallTexture,
+                            (Rectangle){0,0, cannonBallTexture.width, cannonBallTexture.height},
+                            (Rectangle){projectiles[i].position.x, projectiles[i].position.y,10+0.1f*projectiles[i].position.z,10+0.1f*projectiles[i].position.z},
+                            (Vector2){(10+0.1f*projectiles[i].position.z)/2, (10+0.1f*projectiles[i].position.z)/2},
+                            0,
+                            WHITE
+                        );
+                }
+                if (currentState == FIRE_INSTR) { //During shooting instructions phase draw 2D illustration of projectile path
+                    float initialZspeed = PROJECTILE_SPEED*sinf(projectiles[picking].angle); //Initial z axis speed of projectile
+                    //Calculate the max distance the projectile will reach
+                    float maxDistance = PROJECTILE_SPEED*cosf(projectiles[picking].angle)*((initialZspeed+sqrtf(20*GRAVITY+initialZspeed*initialZspeed))/GRAVITY);
+                    //Draw individual points on the projectile path
                     for (float p  = 0; p <= 30; p++) {
+                        //Calculate x and y positions based on the laws of motion
                         float xPos = p*maxDistance/30;
                         Ship ship = ships[picking];
                         float initialX = xPos;
                         float initialY = getLinePoint(projectiles[picking], xPos);
                         float projectileHeading = projectiles[picking].heading;
+                        //Rotate the path of the projectile based on its heading
                         float rotatedX = initialX*cosf(projectileHeading) - initialY*sinf(projectileHeading);
                         float rotatedY = initialX*sinf(projectileHeading) + initialY*cosf(projectileHeading);
                         DrawCircle(rotatedX+ship.position.x+ship.distanceMoved.x, rotatedY+ship.position.y+ship.distanceMoved.y, 3, initialY<=15 ? RED : BLACK);
                     }
                 }
             }
-
             EndMode2D();
             EndDrawing();
             break;
-
-        case END: {
+            case END: { //End screen
                 BeginDrawing();
                 ClearBackground(RAYWHITE);
-                DrawTexturePro( //Draw the background texture
+                DrawTexturePro( //Draw background
                     endTexture,
                     (Rectangle){0, 0, (float)endTexture.width, (float)endTexture.height},
                     (Rectangle){0, 0, (float)screenWidth, (float)screenHeight},
                     (Vector2){0, 0},
                     0.0f,
                     WHITE);
-
-
-                if (playersAlive(ships, selectedPlayers) == 1)
-                {
-                    DrawText("Victory!", screenWidth / 2 - MeasureText("Victory!", 100) / 2, 150, 100, BLACK);
-
-                } else if (playersAlive(ships, selectedPlayers) == 0)
-                {
-                    DrawText("Draw", screenWidth / 2 - MeasureText("Draw", 100) / 2, 150, 100, BLACK);
+                //If there is 1 player alive write "Victory!". If there are no players alive write "Draw"
+                if (playersAlive(ships, selectedPlayers) == 1){
+                    DrawText("Victory!", (screenWidth-MeasureText("Victory!", 100))/2, 150, 100, BLACK);
                 }
-
-                DrawText("Press Enter to return to the main menu.", screenWidth / 2 - MeasureText("Press Enter to return to the main menu.", 30) / 2, 50, 30, WHITE);
-
-                if (IsKeyPressed(KEY_ENTER)) {
+                else if (playersAlive(ships, selectedPlayers) == 0){
+                    DrawText("Draw", (screenWidth-MeasureText("Draw", 100))/2, 150, 100, BLACK);
+                }
+                //Draw navigation instructions
+                DrawText("Press Enter to return to the main menu.", (screenWidth-MeasureText("Press Enter to return to the main menu.", 30))/2, 50, 30, WHITE);
+                if (IsKeyPressed(KEY_ENTER)){ //Go back to main menu
                     currentScreen =TITLE;
                     currentState = DIRECTION_INSTR;
-
-                    for (int i = 0; i < selectedPlayers; i++) {
-                        ships[i].isAlive = 1;
-                        ships[i].position = (Vector2){0, 0};
-                        ships[i].distanceMoved = (Vector2){0};
-                        projectiles[i].position = (Vector3){-10, -10, -10};
-                    }
                 }
-                if (IsKeyPressed(KEY_ESCAPE))
-                {
-                    shouldExit = 1;
-                }
-
                 EndDrawing();
                 break;
-        }
-
-            case SETTINGS: {
+            }
+            case SETTINGS: {//Settings menu
+                //Handle key presses
                 if (IsKeyPressed(KEY_UP)) {
                     PlaySound(selectionSound);
                     selectedOption = (selectedOption - 1 + 7) % 7;
@@ -544,34 +566,35 @@ void main(void){
                 else if (IsKeyPressed(KEY_ENTER)) {
                     PlaySound(confirmSound);
                     switch (selectedOption) {
-                        case 0:
-                            currentScreen= previousScreen;
+                        case 0://Back
+                            currentScreen=previousScreen;
                             break;
-                        case 1:
+                        case 1://Target line option
                             settings.enableTargetLine = !settings.enableTargetLine;
                             break;
-                        case 4:
+                        case 4://How to play instructions
                             currentScreen = HOW_TO_PLAY;
                             break;
-                        case 5:
-                            if (isMidGame) saveGame(ships, projectiles, selectedPlayers, targetPlayer, picking, roundTimer, currentState);
+                        case 5://Main menu
+                            if (isMidGame) saveGame(ships, projectiles, selectedPlayers, targetPlayer, picking, roundTimer, currentState); //Save game state
                             isMidGame = false;
                             PlaySound(selectionSound);
                             currentScreen = TITLE;
-                            StopMusicStream(gameMusic); // Start game music
-                            PlayMusicStream(backgroundMusic); // Stop menu music
+                            StopMusicStream(gameMusic);
+                            PlayMusicStream(backgroundMusic);
                             selectedOption=0;
                             break;
-                        case 6:
-                            if (isMidGame) saveGame(ships, projectiles, selectedPlayers, targetPlayer, picking, roundTimer, currentState);
+                        case 6://Exit to desktop
+                            if (isMidGame) saveGame(ships, projectiles, selectedPlayers, targetPlayer, picking, roundTimer, currentState); //Save game state
                             shouldExit = 1;
                             break;
                     }
                 }
-                if (IsKeyPressed(KEY_ESCAPE)) {
+                if (IsKeyPressed(KEY_ESCAPE)) {//Go back
                     PlaySound(confirmSound);
                     currentScreen = previousScreen;
                 }
+                //Draw text
                 BeginDrawing();
                 ClearBackground((Color){255, 255, 255, 100});
                 DrawText("SETTINGS MENU", 100, 100, 50, BLACK);
@@ -587,29 +610,30 @@ void main(void){
                 EndDrawing();
                 break;
             }
-             case HOW_TO_PLAY: {
-                    BeginDrawing();
-                    ClearBackground((Color){255, 255, 255, 100});
-                    DrawText("HOW TO PLAY", 100, 100, 50, BLACK);
-                    DrawText("Control the ship movement by setting up the direction with your mouse and left click to perform the movement.",100, 200, 30, BLACK);
-                    DrawText ("Avoid obstacles and other ships, as any collision or hit can knock you out.",100, 250, 30, BLACK );
-                    DrawText ("The ships movement is paused mid-game and you are given the ability to fire a shot ",100, 350, 30, BLACK) ;
-                    DrawText ("as well as a helpful red line for each pair of ships indicating their final positions between them.",100, 400, 30, BLACK );
-                    DrawText ("You can wander around each opponent's final position relative to yours by pressing the up and down arrows.",100, 500, 30, BLACK );
-                    DrawText("To attack, aim based on the final positions of the ships and fire using Left click.", 100, 550, 30, BLACK);
-                    DrawText ("Adjust the firing angle with the scroll wheel. After the pause, the ships movement continues, ",100, 650, 30, BLACK );
-                    DrawText ("while at the end of the movement the shots are fired. ",100, 700, 30, BLACK );
-                    DrawText ("The process repeats until a player is crowned the winner of the game or until all players are eliminated.", 100, 800, 30, BLACK  );
-                    DrawText("Press ESC to return to the Settings Menu", 100, 900, 20, BLACK);
+            case HOW_TO_PLAY: {//How to play instructions
+                BeginDrawing();
+                //Draw text
+                ClearBackground((Color){255, 255, 255, 100});
+                DrawText("HOW TO PLAY", 100, 100, 50, BLACK);
+                DrawText("Control the ship movement by setting up the direction with your mouse and left click to perform the movement.",100, 200, 30, BLACK);
+                DrawText ("Avoid obstacles and other ships, as any collision or hit can knock you out.",100, 250, 30, BLACK );
+                DrawText ("The ships movement is paused mid-game and you are given the ability to fire a shot ",100, 350, 30, BLACK) ;
+                DrawText ("as well as a helpful red line for each pair of ships indicating their final positions between them.",100, 400, 30, BLACK );
+                DrawText ("You can wander around each opponent's final position relative to yours by pressing the up and down arrows.",100, 500, 30, BLACK );
+                DrawText("To attack, aim based on the final positions of the ships and fire using Left click.", 100, 550, 30, BLACK);
+                DrawText ("Adjust the firing angle with the scroll wheel. After the pause, the ships movement continues, ",100, 650, 30, BLACK );
+                DrawText ("while at the end of the movement the shots are fired. ",100, 700, 30, BLACK );
+                DrawText ("The process repeats until a player is crowned the winner of the game or until all players are eliminated.", 100, 800, 30, BLACK  );
+                DrawText("Press ESC to return to the Settings Menu", 100, 900, 20, BLACK);
 
-                    EndDrawing();
+                EndDrawing();
 
-                    if (IsKeyPressed(KEY_ESCAPE)) {
-                        PlaySound(confirmSound);
-                        currentScreen = previousScreen;
-                    }
-                    break;
+                if (IsKeyPressed(KEY_ESCAPE)) {//Go back
+                    PlaySound(confirmSound);
+                    currentScreen = previousScreen;
                 }
+                break;
+            }
         }
     }
     //Unload all textures
@@ -625,23 +649,26 @@ void main(void){
     UnloadSound(confirmSound);
     CloseAudioDevice();
 
-    if (isMidGame) saveGame(ships, projectiles, selectedPlayers, targetPlayer, picking, roundTimer, currentState);
-    saveSettings();
-    //Close the window
-    CloseWindow();
+    if (isMidGame) saveGame(ships, projectiles, selectedPlayers, targetPlayer, picking, roundTimer, currentState); //Save game state
+    saveSettings(); //Save settings
+    CloseWindow();//Close the window
 }
 
+//Calculates the start and end positions of a line spanning across the whole map defined by the final positions of ships A and B
 Line getTargetLine(Ship ships[], int shipA, int shipB) {
-    Ship shipOrigin = ships[shipA];
-    Ship shipTarget = ships[shipB];
+    Ship shipOrigin = ships[shipA]; //Origin ship
+    Ship shipTarget = ships[shipB]; //Target ship
+    //Get final ship positions
     shipOrigin.position = Vector2Add(shipOrigin.position, shipOrigin.distanceMoved);
     shipTarget.position = Vector2Add(shipTarget.position, shipTarget.distanceMoved);
+    //Get the vector defined by the two ships and extend it to ensure it crosses the map boundaries
     Vector2 targetVector = Vector2Subtract(shipOrigin.position,shipTarget.position);
     targetVector = Vector2Scale(targetVector, 4000/Vector2Length(targetVector));
     Line checkLine = {
         Vector2Add(targetVector, shipOrigin.position),
         Vector2Add(Vector2Negate(targetVector), shipOrigin.position),
     };
+    //Get the intersection points between the check line and the map edges
     Line line  = {(Vector2){-1, -1}, (Vector2){-1, -1}};
     CheckCollisionLines(checkLine.start, checkLine.end, (Vector2){0,0}, GetScreenToWorld2D((Vector2){screenWidth, 0}, camera), &line.start);
     CheckCollisionLines(checkLine.start, checkLine.end, GetScreenToWorld2D((Vector2){screenWidth,0}, camera), GetScreenToWorld2D((Vector2){screenWidth, screenWidth}, camera), line.start.x==-1 ? & line.start : &line.end);
@@ -651,13 +678,13 @@ Line getTargetLine(Ship ships[], int shipA, int shipB) {
 }
 
 
-
+//Save the current game state to a file named "save.dat"
 void saveGame(Ship *ships, Projectile *projectiles, int selectedPlayers, int targetPlayer, int picking, float roundTimer, GameState gameState) {
-    FILE *f = fopen("save.dat", "wb");
-    if (f == NULL) {
+    FILE *f = fopen("save.dat", "wb"); //Open the file in write binary mode
+    if (f == NULL) {//Check if file was opened correctly
         printf("Failed to save game!\n");
     }
-    else {
+    else {//Create struct with all variables to save
         struct {
             Ship shipsArray[MAX_PLAYERS];
             Projectile prjectileArray[MAX_PLAYERS];
@@ -678,20 +705,22 @@ void saveGame(Ship *ships, Projectile *projectiles, int selectedPlayers, int tar
             saveStruct.shipsArray[i] = ships[i];
             saveStruct.prjectileArray[i] = projectiles[i];
         }
+        //Write the data to the file
         if (fwrite(&saveStruct, sizeof(saveStruct), 1, f)!=1) {
             printf("Failed to save game!\n");
         }
     }
-    fclose(f);
+    fclose(f);//Close the file
 }
 
+//Load the previous game state from a file named "save.dat"
 bool loadGame(Ship *ships, Projectile *projectiles, int *selectedPlayers, int *targetPlayer, int *picking, float *roundTimer, GameState *gameState) {
-    FILE *f = fopen("save.dat", "rb");
-    if (f == NULL) {
+    FILE *f = fopen("save.dat", "rb"); //Open the file in read binary mode
+    if (f == NULL) {//Ensure file was opened correctly
         printf("Failed to load game!\n");
         fclose(f);
         return false;
-    }
+    }//Create struct to store the data from the file
     struct {
             Ship shipsArray[MAX_PLAYERS];
             Projectile prjectileArray[MAX_PLAYERS];
@@ -701,10 +730,13 @@ bool loadGame(Ship *ships, Projectile *projectiles, int *selectedPlayers, int *t
             float rndTimer;
             GameState state;
         } saveStruct;
+    //Read the data
     if (fread(&saveStruct, sizeof(saveStruct), 1, f)!=1) {
         fclose(f);
         return false;
     }
+    //Set all local variables to those read from the file
+    //Returns true if successful and false if not
     for (int i = 0; i < MAX_PLAYERS; i++) {
         ships[i] = saveStruct.shipsArray[i];
         projectiles[i] = saveStruct.prjectileArray[i];
@@ -718,29 +750,32 @@ bool loadGame(Ship *ships, Projectile *projectiles, int *selectedPlayers, int *t
     return true;
 }
 
+//Save the current settings to a file named "settings.dat";
 void saveSettings() {
-    FILE *f = fopen("settings.cfg", "wb");
-    if (f == NULL) {
+    FILE *f = fopen("settings.dat", "wb");
+    if (f == NULL) {//Check if file was opened correctly
         printf("Failed to save settings!\n");
         fclose(f);
         return;
     }
+    //Write the date to the file and close it
     if (fwrite(&settings, sizeof(settings), 1, f)!=1) {
         printf("Failed to save settings!\n");
-        fclose(f);
     }
-
+    fclose(f);
 }
 
+//Load the settings from a file named "settings.dat"
 void loadSettings() {
-    FILE *f = fopen("settings.cfg", "rb");
-    if (f == NULL) {
+    FILE *f = fopen("settings.dat", "rb"); //Open the file in read binary mode
+    if (f == NULL) {//Check if the file was opened correctly
         printf("Failed to load settings!\n");
         fclose(f);
         return;
     }
+    //Read the data from the file and write it to the local settings struct
     if (fread(&settings, sizeof(settings), 1, f)!=1) {
         printf("Failed to load settings!\n");
-        fclose(f);
     }
+    fclose(f);
 }

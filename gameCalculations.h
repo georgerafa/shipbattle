@@ -1,3 +1,5 @@
+//Definitions and function prototypes
+
 #ifndef GAMECALCULATIONS_H
 #define GAMECALCULATIONS_H
 #define PROJECTILE_SPEED  200.0f //The initial projectile speed
