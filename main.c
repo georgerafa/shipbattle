@@ -9,6 +9,7 @@
 
 float countdownTimer = 3.0f; // Countdown timer for 3-2-1-Go
 float roundTimer = 10.0f;
+bool isMidGame = false;
 
 typedef enum GameState {DIRECTION_INSTR, MOVEMENT_A, FIRE_INSTR, MOVEMENT_B, FIRE} GameState;
 typedef enum GameScreen {TITLE, PLAYER_SELECT, COUNTDOWN, GAME, SETTINGS, HOW_TO_PLAY, END} GameScreen; //All screen states
@@ -30,6 +31,8 @@ int checkProjectileCollision(Ship ship, Projectile projectiles[]);
 int checkTerrainCollision(Ship ship, struct CollisionSection[], int sectionCount);
 int playersAlive(Ship ships[]);
 Line getTargetLine(Ship ships[], int shipA, int shipB);
+void saveGame(Ship *ships, Projectile *projectiles, int selectedPlayers, int targetPlayer, int picking, float roundTimer, GameState gameState);
+bool loadGame(Ship *ships, Projectile *projectiles, int *selectedPlayers, int *targetPlayer, int *picking, float *roundTimer, GameState *gameState);
 
 // Sound variables
 Music backgroundMusic;
@@ -171,20 +174,23 @@ void main(void){
             }
             if (IsKeyPressed(KEY_ENTER)) {
                 switch (selectedOption) {
-                    case 0:
+                    case 0://New game
                         PlaySound(confirmSound);
                         currentScreen = PLAYER_SELECT;
                         break;
-                    case 1:
+                    case 1://Load game
                         PlaySound(confirmSound);
+                        loadGame(ships, projectiles, &selectedPlayers, &targetPlayer, &picking, &roundTimer, &currentState);
+                        isMidGame = true;
+                        currentScreen = GAME;
                         break;
-                    case 2:
+                    case 2://Settings
                         PlaySound(confirmSound);
                         previousScreen = TITLE;
                         currentScreen = SETTINGS;
                         selectedOption = 0;
                         break;
-                    case 3:
+                    case 3://Quit
                         shouldExit = true;
                         break;
                 }
@@ -276,6 +282,7 @@ void main(void){
         case COUNTDOWN: // Countdown screen
             countdownTimer -= GetFrameTime()*1.1f;
             if (countdownTimer <= -1) {
+                isMidGame = true;
                 currentScreen = GAME; // Transition to game screen
                 initializeShips(ships, selectedPlayers);
             }
@@ -409,6 +416,7 @@ void main(void){
                     if (projectilesAlive==0) {
                         resetProjectiles(projectiles, selectedPlayers);
                         if (playersAlive(ships) <= 1) {
+                            isMidGame = false;
                             currentScreen = END;
                             StopMusicStream(gameMusic); // Start game music
                             PlayMusicStream(backgroundMusic); // Stop menu music
@@ -469,7 +477,6 @@ void main(void){
         case END: {
                 BeginDrawing();
                 ClearBackground(RAYWHITE);
-
                 DrawTexturePro( //Draw the background texture
                     endTexture,
                     (Rectangle){0, 0, (float)endTexture.width, (float)endTexture.height},
@@ -511,7 +518,6 @@ void main(void){
         }
 
             case SETTINGS: {
-                    static int selected_option = 0;
                     if (IsKeyPressed(KEY_UP)) {
                         PlaySound(selectionSound);
                         selectedOption = (selectedOption - 1 + 6) % 6;
@@ -544,6 +550,8 @@ void main(void){
                         currentScreen = HOW_TO_PLAY;
                     } else if (selectedOption == 4 && IsKeyPressed(KEY_ENTER))
                     {
+                        if (isMidGame) saveGame(ships, projectiles, selectedPlayers, targetPlayer, picking, roundTimer, currentState);
+                        isMidGame = false;
                         PlaySound(selectionSound);
                         currentScreen = TITLE;
                         StopMusicStream(gameMusic); // Start game music
@@ -552,6 +560,7 @@ void main(void){
 
                     } else if (selectedOption == 5 && IsKeyPressed(KEY_ENTER))
                     {
+                        if (isMidGame) saveGame(ships, projectiles, selectedPlayers, targetPlayer, picking, roundTimer, currentState);
                         shouldExit = 1;
                     }
 
@@ -616,6 +625,8 @@ void main(void){
     UnloadSound(selectionSound);
     UnloadSound(confirmSound);
     CloseAudioDevice();
+
+    if (isMidGame) saveGame(ships, projectiles, selectedPlayers, targetPlayer, picking, roundTimer, currentState);
 
     //Close the window
     CloseWindow();
@@ -780,4 +791,71 @@ int checkTerrainCollision(Ship ship, struct CollisionSection sections[], int sec
         }
     }
     return 0; //Return 0 if no collision is detected
+}
+
+void saveGame(Ship *ships, Projectile *projectiles, int selectedPlayers, int targetPlayer, int picking, float roundTimer, GameState gameState) {
+    FILE *f;
+    f = fopen("save.dat", "wb");
+    if (f == NULL) {
+        printf("Failed to save game!\n");
+    }
+    else {
+        struct {
+            Ship shipsArray[MAX_PLAYERS];
+            Projectile prjectileArray[MAX_PLAYERS];
+            int numPlayers;
+            int trgtPlayer;
+            int pickingPlayer;
+            float rndTimer;
+            GameState state;
+        } saveStruct;
+
+        saveStruct.numPlayers  = selectedPlayers;
+        saveStruct.trgtPlayer = targetPlayer;
+        saveStruct.pickingPlayer = picking;
+        saveStruct.rndTimer = roundTimer;
+        saveStruct.state = gameState;
+
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            saveStruct.shipsArray[i] = ships[i];
+            saveStruct.prjectileArray[i] = projectiles[i];
+        }
+        if (fwrite(&saveStruct, sizeof(saveStruct), 1, f)!=1) {
+            printf("Failed to save game!\n");
+        }
+    }
+    fclose(f);
+}
+
+bool loadGame(Ship *ships, Projectile *projectiles, int *selectedPlayers, int *targetPlayer, int *picking, float *roundTimer, GameState *gameState) {
+    FILE *f = fopen("save.dat", "rb");
+    if (f == NULL) {
+        printf("Failed to load game!\n");
+        fclose(f);
+        return false;
+    }
+    struct {
+            Ship shipsArray[MAX_PLAYERS];
+            Projectile prjectileArray[MAX_PLAYERS];
+            int numPlayers;
+            int trgtPlayer;
+            int pickingPlayer;
+            float rndTimer;
+            GameState state;
+        } saveStruct;
+    if (fread(&saveStruct, sizeof(saveStruct), 1, f)!=1) {
+        fclose(f);
+        return false;
+    }
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        ships[i] = saveStruct.shipsArray[i];
+        projectiles[i] = saveStruct.prjectileArray[i];
+    }
+    *selectedPlayers = saveStruct.numPlayers;
+    *targetPlayer = saveStruct.trgtPlayer;
+    *picking = saveStruct.pickingPlayer;
+    *roundTimer = saveStruct.rndTimer;
+    *gameState = saveStruct.state;
+    fclose(f);
+    return true;
 }
