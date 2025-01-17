@@ -2,7 +2,6 @@
 #include <math.h>
 #include <stdio.h>
 #include "gameCalculations.h"
-#include "raymath.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -538,8 +537,8 @@ void main(void){
                     if (selectedOption == 3) {
                         PlaySound(selectionSound);
                         settings.soundVolume = IsKeyPressed(KEY_RIGHT) ? fminf(settings.soundVolume + 0.1f, 1.0f) : fmaxf(settings.soundVolume - 0.1f, 0.0f);
-                        SetMusicVolume(backgroundMusic, settings.soundVolume);
-                        SetMusicVolume(gameMusic, settings.soundVolume);
+                        SetSoundVolume(confirmSound, settings.soundVolume);
+                        SetSoundVolume(selectionSound, settings.soundVolume);
                     }
                 }
                 else if (IsKeyPressed(KEY_ENTER)) {
