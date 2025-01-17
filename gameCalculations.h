@@ -4,6 +4,7 @@
 #define GRAVITY  45.0f //Gravitational acceleration
 #define maxShipSpeed 75
 #define MAX_PLAYERS 6
+#include "raymath.h"
 typedef struct ShipStruct {
     int team; //Ship team
     Vector2 position; //Current ship position
