@@ -20,22 +20,9 @@ bool isMidGame = false;
 typedef enum GameState {DIRECTION_INSTR, MOVEMENT_A, FIRE_INSTR, MOVEMENT_B, FIRE} GameState;
 typedef enum GameScreen {TITLE, PLAYER_SELECT, COUNTDOWN, GAME, SETTINGS, HOW_TO_PLAY, END} GameScreen; //All screen states
 
-typedef struct Line {
-    Vector2 start;
-    Vector2 end;
-} Line;
 
-struct CollisionSection {
-    Vector2 centerPosition;
-    int minimumDistance;
-    Line Lines[10];
-};
 
 //Declare function prototypes
-void checkShipCollisions(Ship *ships);
-int checkProjectileCollision(Ship ship, Projectile projectiles[]);
-int checkTerrainCollision(Ship ship, struct CollisionSection[], int sectionCount);
-int playersAlive(Ship ships[]);
 Line getTargetLine(Ship ships[], int shipA, int shipB);
 void saveGame(Ship *ships, Projectile *projectiles, int selectedPlayers, int targetPlayer, int picking, float roundTimer, GameState gameState);
 bool loadGame(Ship *ships, Projectile *projectiles, int *selectedPlayers, int *targetPlayer, int *picking, float *roundTimer, GameState *gameState);
@@ -335,24 +322,26 @@ void main(void){
                 case MOVEMENT_A: {
                     updateShipPositions(ships, selectedPlayers, GetFrameTime());
                     roundTimer -= GetFrameTime();
-                    checkShipCollisions(ships);
+                    checkShipCollisions(ships, selectedPlayers);
                     for (int i = 0; i < selectedPlayers; i++) {
                         if (ships[i].position.x > mapBounds.x || ships[i].position.y > mapBounds.y) ships[i].isAlive = 0;
                         ships[i].isAlive = (1 - checkTerrainCollision(ships[i], readSections, segmentCount))*ships[i].isAlive;
                     }
-                    if (playersAlive(ships) == 0) {
+                    if (playersAlive(ships, selectedPlayers) == 0) {
                         currentScreen = END;
+                        remove("save.dat");
                         isMidGame = false;
                         StopMusicStream(gameMusic);
                         PlayMusicStream(backgroundMusic);
                     }
-                    if (roundTimer <= 5 && playersAlive(ships) > 1) {
+                    if (roundTimer <= 5 && playersAlive(ships, selectedPlayers) > 1) {
                         currentState = FIRE_INSTR;
                         resetProjectiles(projectiles, selectedPlayers);
                         GetMouseWheelMove();
                     }
                     else if (roundTimer <= 0){
                         currentScreen = END;
+                        remove("save.dat");
                         isMidGame = false;
                         StopMusicStream(gameMusic);
                         PlayMusicStream(backgroundMusic);
@@ -375,7 +364,7 @@ void main(void){
 
                     Line targetLine;
 
-                    if (playersAlive(ships) > 1) {
+                    if (playersAlive(ships, selectedPlayers) > 1) {
                         if (IsKeyPressed(KEY_DOWN)) {
                             if (--targetPlayer<0) targetPlayer = selectedPlayers-1;
                             while (ships[targetPlayer].isAlive == 0 || picking == targetPlayer) --targetPlayer < 0 ? targetPlayer = selectedPlayers-1 : targetPlayer;
@@ -399,14 +388,15 @@ void main(void){
                 case MOVEMENT_B: {
                     updateShipPositions(ships, selectedPlayers, GetFrameTime());
                     roundTimer -=GetFrameTime();
-                    checkShipCollisions(ships);
+                    checkShipCollisions(ships, selectedPlayers);
                     for (int i = 0; i < selectedPlayers; i++) {
                         if (ships[i].position.x > mapBounds.x || ships[i].position.y > mapBounds.y) ships[i].isAlive = 0;
                         ships[i].isAlive = (1 - checkTerrainCollision(ships[i], readSections, segmentCount))*ships[i].isAlive;
                     }
-                    if (playersAlive(ships) == 0) {
+                    if (playersAlive(ships, selectedPlayers) == 0) {
                         currentScreen = END;
                         isMidGame = false;
+                        remove("save.dat");
                         StopMusicStream(gameMusic); // Start game music
                         PlayMusicStream(backgroundMusic); // Stop menu music
                     }
@@ -420,15 +410,16 @@ void main(void){
                     updateProjectiles(projectiles, ships, selectedPlayers, GetFrameTime());
                     int projectilesAlive = 0;
                     for (int i = 0; i<selectedPlayers; i++) {
-                        int aliveState = (1-checkProjectileCollision(ships[i], projectiles))*ships[i].isAlive;
+                        int aliveState = (1-checkProjectileCollision(ships[i], projectiles, selectedPlayers))*ships[i].isAlive;
                         ships[i].isAlive = aliveState;
                         if (projectiles[i].position.z>0)  projectilesAlive++;
                     }
                     if (projectilesAlive==0) {
                         resetProjectiles(projectiles, selectedPlayers);
-                        if (playersAlive(ships) <= 1) {
+                        if (playersAlive(ships, selectedPlayers) <= 1) {
                             isMidGame = false;
                             currentScreen = END;
+                            remove("save.dat");
                             StopMusicStream(gameMusic); // Start game music
                             PlayMusicStream(backgroundMusic); // Stop menu music
                         }
@@ -497,11 +488,11 @@ void main(void){
                     WHITE);
 
 
-                if (playersAlive(ships) == 1)
+                if (playersAlive(ships, selectedPlayers) == 1)
                 {
                     DrawText("Victory!", screenWidth / 2 - MeasureText("Victory!", 100) / 2, 150, 100, BLACK);
 
-                } else if (playersAlive(ships) == 0)
+                } else if (playersAlive(ships, selectedPlayers) == 0)
                 {
                     DrawText("Draw", screenWidth / 2 - MeasureText("Draw", 100) / 2, 150, 100, BLACK);
                 }
@@ -660,146 +651,7 @@ Line getTargetLine(Ship ships[], int shipA, int shipB) {
     return line;
 }
 
-int playersAlive(Ship ships[]) {
-    int playersAlive = 0;
-    for (int i = 0; i < selectedPlayers; i++) {
-        if (ships[i].isAlive == 1) playersAlive++;
-    }
-    return playersAlive;
-}
 
-void checkShipCollisions(Ship *ships) {
-    for (int i = 0; i < selectedPlayers; i++) {
-        for (int j = 0; j < selectedPlayers; j++) {
-            if (i!=j && ships[i].isAlive == 1 && ships[j].isAlive == 1 && Vector2Length(Vector2Subtract(ships[i].position, ships[j].position))<120) {
-                Line shipLinesI[4] = {
-                    {
-                        {(-40*cosf(ships[i].heading)-15*sinf(ships[i].heading)+ships[i].position.x),(-40*sinf(ships[i].heading)+15*cosf(ships[i].heading)+ships[i].position.y)},
-                       {(40*cosf(ships[i].heading)-15*sinf(ships[i].heading)+ships[i].position.x),(40*sinf(ships[i].heading)+15*cosf(ships[i].heading)+ships[i].position.y)}
-                    },
-                    {
-                    {(-40*cosf(ships[i].heading)+15*sinf(ships[i].heading)+ships[i].position.x), (-40*sinf(ships[i].heading)-15*cosf(ships[i].heading)+ships[i].position.y)},
-                    {(40*cosf(ships[i].heading)+15*sinf(ships[i].heading)+ships[i].position.x), (40*sinf(ships[i].heading)-15*cosf(ships[i].heading)+ships[i].position.y)}
-                    },
-                    {
-                    {(-40*cosf(ships[i].heading)-15*sinf(ships[i].heading)+ships[i].position.x), (-40*sinf(ships[i].heading)+15*cosf(ships[i].heading)+ships[i].position.y)},
-                    {(-40*cosf(ships[i].heading)+15*sinf(ships[i].heading)+ships[i].position.x), (-40*sinf(ships[i].heading)-15*cosf(ships[i].heading)+ships[i].position.y)}
-                    },
-                    {
-                    {40*cosf(ships[i].heading)-15*sinf(ships[i].heading)+ships[i].position.x, 40*sinf(ships[i].heading)+15*cosf(ships[i].heading)+ships[i].position.y},
-                    {(40*cosf(ships[i].heading)+15*sinf(ships[i].heading)+ships[i].position.x), (40*sinf(ships[i].heading)-15*cosf(ships[i].heading)+ships[i].position.y)}
-                    }
-                };
-
-                Line shipLinesJ[4] = {
-                    {
-                        {(-40*cosf(ships[j].heading)-15*sinf(ships[j].heading)+ships[j].position.x),(-40*sinf(ships[j].heading)+15*cosf(ships[j].heading)+ships[j].position.y)},
-                       {(40*cosf(ships[j].heading)-15*sinf(ships[j].heading)+ships[j].position.x),(40*sinf(ships[j].heading)+15*cosf(ships[j].heading)+ships[j].position.y)}
-                    },
-                    {
-                        {(-40*cosf(ships[j].heading)+15*sinf(ships[j].heading)+ships[j].position.x), (-40*sinf(ships[j].heading)-15*cosf(ships[j].heading)+ships[j].position.y)},
-                        {(40*cosf(ships[j].heading)+15*sinf(ships[j].heading)+ships[j].position.x), (40*sinf(ships[j].heading)-15*cosf(ships[j].heading)+ships[j].position.y)}
-                    },
-                    {
-                        {(-40*cosf(ships[j].heading)-15*sinf(ships[j].heading)+ships[j].position.x), (-40*sinf(ships[j].heading)+15*cosf(ships[j].heading)+ships[j].position.y)},
-                        {(-40*cosf(ships[j].heading)+15*sinf(ships[j].heading)+ships[j].position.x), (-40*sinf(ships[j].heading)-15*cosf(ships[j].heading)+ships[j].position.y)}
-                    },
-                    {
-                        {40*cosf(ships[j].heading)-15*sinf(ships[j].heading)+ships[j].position.x, 40*sinf(ships[j].heading)+15*cosf(ships[j].heading)+ships[j].position.y},
-                        {(40*cosf(ships[j].heading)+15*sinf(ships[j].heading)+ships[j].position.x), (40*sinf(ships[j].heading)-15*cosf(ships[j].heading)+ships[j].position.y)}
-                    }
-                };
-                for (int k = 0; k < 4; k++) {
-                    for (int l = 0; l < 4; l++) {
-                        if (CheckCollisionLines(shipLinesI[k].start, shipLinesI[k].end, shipLinesJ[l].start, shipLinesJ[l].end, NULL)) {
-                            ships[i].isAlive = 0;
-                            ships[j].isAlive = 0;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-int checkProjectileCollision(Ship ship, Projectile *projectiles) {
-    Vector2 shipPos = ship.position;//Position of the provided ship
-    if (ship.isAlive==0) return 0;
-    Line shipLines[4] = { //The line segments that make up the hitbox of the ship
-        {
-            {-40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x,-40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y},
-           {40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x,40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y}
-        },
-        {
-                        {-40*cosf(ship.heading)-7*sinf(ship.heading)+shipPos.x,-40*sinf(ship.heading)+7*cosf(ship.heading)+shipPos.y},
-                        {40*cosf(ship.heading)-7*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)+7*cosf(ship.heading)+shipPos.y}
-        },
-        {
-                        {-40*cosf(ship.heading)+7*sinf(ship.heading)+shipPos.x, -40*sinf(ship.heading)-7*cosf(ship.heading)+shipPos.y},
-                        {40*cosf(ship.heading)+7*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)-7*cosf(ship.heading)+shipPos.y}
-        },
-        {
-                        {-40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x, -40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y},
-                        {40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y}
-        }
-    };
-    for (int i = 0; i < selectedPlayers; i++) {
-        Projectile projectile = projectiles[i];
-        for (int j = 0; j < 4; j++) {
-            if (CheckCollisionCircleLine((Vector2){projectile.position.x, projectile.position.y}, 15, shipLines[i].start, shipLines[i].end)&&projectile.position.z<15&&projectile.position.z>0&&projectile.team!=ship.team) {
-                projectiles[i].position.z = -10;
-                return 1;
-            }
-        }
-    }
-    return 0;
-}
-
-int checkTerrainCollision(Ship ship, struct CollisionSection sections[], int sectionCount){//Checks if the provided ship is colliding with any obstacle. Returns 1 if it detects collision and 0 if it doesn't
-    Vector2 shipPos = ship.position;//Position of the provided ship
-    Line shipLines[4] = { //The line segments that make up the hitbox of the ship
-        {
-            {(-40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x),(-40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)},
-           {(40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x),(40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)}
-        },
-        {
-            {(-40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (-40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)},
-            {(40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)}
-        },
-        {
-            {(-40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x), (-40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y)},
-            {(-40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (-40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)}
-        },
-        {
-            {40*cosf(ship.heading)-15*sinf(ship.heading)+shipPos.x, 40*sinf(ship.heading)+15*cosf(ship.heading)+shipPos.y},
-            {(40*cosf(ship.heading)+15*sinf(ship.heading)+shipPos.x), (40*sinf(ship.heading)-15*cosf(ship.heading)+shipPos.y)}
-        }
-    };
-
-    for (int i = 0; i < sectionCount; i++) {//Iterate through all obstacles
-        struct CollisionSection section = sections[i]; //Current obstacle
-        Vector2 centerPos = section.centerPosition; //Obstacle offset from (0,0)
-        //If the distance, between the ship and the obstacle, is less than 200 pixels check for collision
-        if(Vector2Length(Vector2Subtract(centerPos,ship.position)) < (float)section.minimumDistance) {
-            //Iterate through section hitbox lines
-            for (int j = 0; j<10; j++) {
-                //Temporary collision point variable
-                Vector2 colP;
-                //Iterate through ship hitbox lines
-                for (int k = 0; k<4; k++) {
-                    //If there is a collision between the terrain and ship lines then return 1
-                    if (CheckCollisionLines(
-                    section.Lines[j].start, //Island line start point
-                    section.Lines[j].end, //Island line end point
-                    shipLines[k].start, //Ship line start point
-                    shipLines[k].end, //Ship line end point
-                        &colP)) //Collision point variable
-                        return 1;
-                }
-            }
-        }
-    }
-    return 0; //Return 0 if no collision is detected
-}
 
 void saveGame(Ship *ships, Projectile *projectiles, int selectedPlayers, int targetPlayer, int picking, float roundTimer, GameState gameState) {
     FILE *f = fopen("save.dat", "wb");

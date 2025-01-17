@@ -21,6 +21,21 @@ typedef struct ProjectileStruct {
     float angle; //Elevation angle in radians
 } Projectile;
 
+typedef struct Line {
+    Vector2 start;
+    Vector2 end;
+} Line;
+
+struct CollisionSection {
+    Vector2 centerPosition;
+    int minimumDistance;
+    Line Lines[10];
+};
+
+int playersAlive(Ship ships[], int playerCount);
+void checkShipCollisions(Ship *ships, int playerCount);
+int checkProjectileCollision(Ship ship, Projectile *projectiles, int playerCount);
+int checkTerrainCollision(Ship ship, struct CollisionSection[], int sectionCount);
 int getLinePoint(Projectile p, int x);
 void updateShipPositions(Ship *ships, int shipCount, float deltaT);
 void updateProjectiles(Projectile *projectiles, Ship *ships, int projectileCount, float deltaT);
