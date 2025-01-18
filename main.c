@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2025 EverTech1, georgeheristan
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+
+
 #include "raylib.h"
 #include <math.h>
 #include <stdio.h>
@@ -191,20 +210,22 @@ void main(void){
                 switch (selectedOption) {
                     case 0://New game
                         PlaySound(confirmSound);
-                    currentScreen = PLAYER_SELECT;
+                        currentScreen = PLAYER_SELECT;
                     break;
                     case 1://Load game
                         PlaySound(confirmSound);
-                    if (loadGame(ships, projectiles, &selectedPlayers, &targetPlayer, &picking, &roundTimer, &currentState)) {
-                        isMidGame = true;
-                        currentScreen = GAME;
-                    }
+                        if (loadGame(ships, projectiles, &selectedPlayers, &targetPlayer, &picking, &roundTimer, &currentState)) {
+                            isMidGame = true;
+                            currentScreen = GAME;
+                            PlayMusicStream(gameMusic);
+                            StopMusicStream(backgroundMusic);
+                        }
                     break;
                     case 2://Settings
                         PlaySound(confirmSound);
-                    previousScreen = TITLE;
-                    currentScreen = SETTINGS;
-                    selectedOption = 0;
+                        previousScreen = TITLE;
+                        currentScreen = SETTINGS;
+                        selectedOption = 0;
                     break;
                     case 3://Quit
                         shouldExit = true;
@@ -428,7 +449,7 @@ void main(void){
                     break;
                 }
                 case FIRE: { //Shooting phase
-                    updateProjectiles(projectiles, ships, selectedPlayers, GetFrameTime()); //Update projectile positions
+                    updateProjectiles(projectiles, selectedPlayers, GetFrameTime()); //Update projectile positions
                     //Calculate the number of projectiles still flying
                     int projectilesAlive = 0;
                     for (int i = 0; i<selectedPlayers; i++) {

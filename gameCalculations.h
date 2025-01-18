@@ -1,5 +1,22 @@
-//Definitions and function prototypes
+/*
+Copyright (C) 2025 EverTech1, georgeheristan
 
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+
+//Definitions and function prototypes
 #ifndef GAMECALCULATIONS_H
 #define GAMECALCULATIONS_H
 #define PROJECTILE_SPEED  200.0f //The initial projectile speed
@@ -41,7 +58,7 @@ int checkProjectileCollision(Ship ship, Projectile *projectiles, int playerCount
 int checkTerrainCollision(Ship ship, struct CollisionSection[], int sectionCount);
 int getLinePoint(Projectile p, int x);
 void updateShipPositions(Ship *ships, int shipCount, float deltaT);
-void updateProjectiles(Projectile *projectiles, Ship *ships, int projectileCount, float deltaT);
+void updateProjectiles(Projectile *projectiles, int projectileCount, float deltaT);
 void initializeProjectiles(Projectile *projectiles, Ship ships[], int playerCount);
 void resetProjectiles(Projectile *projectiles, int projectileCount);
 void initializeShips(Ship *ships, int shipCount);

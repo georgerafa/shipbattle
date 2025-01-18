@@ -1,3 +1,21 @@
+/*
+Copyright (C) 2025 EverTech1, georgeheristan
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+
 #include <math.h>
 #include "raylib.h"
 #include <stddef.h>
@@ -78,7 +96,7 @@ void initializeProjectiles(Projectile *projectiles, Ship ships[], int playerCoun
 }
 
 //Update the projectiles' speeds and positions while also applying gravity
-void updateProjectiles(Projectile *projectiles, Ship *ships, int projectileCount, float deltaT) {
+void updateProjectiles(Projectile *projectiles, int projectileCount, float deltaT) {
     for (int i = 0; i < projectileCount; i++) {
         Projectile projectile = projectiles[i];
         if (projectiles[i].position.z > 0) {
