@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2025 EverTech1, georgeheristan
+Copyright (C) 2025 EverTech1, georgerafa
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
